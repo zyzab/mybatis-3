@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2016 the original author or authors.
+ *    Copyright 2009-2020 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -15,40 +15,36 @@
  */
 package org.apache.ibatis.mapping;
 
+import static com.googlecode.catchexception.apis.BDDCatchException.*;
+import static org.assertj.core.api.BDDAssertions.then;
+
+import java.lang.reflect.Field;
+
 import org.apache.ibatis.builder.InitializingObject;
 import org.apache.ibatis.cache.Cache;
 import org.apache.ibatis.cache.CacheException;
 import org.apache.ibatis.cache.impl.PerpetualCache;
-import org.hamcrest.core.Is;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
-
-public class CacheBuilderTest {
-
-  @Rule
-  public ExpectedException expectedException = ExpectedException.none();
+class CacheBuilderTest {
 
   @Test
-  public void testInitializing() throws Exception {
+  void testInitializing() {
     InitializingCache cache = unwrap(new CacheBuilder("test").implementation(InitializingCache.class).build());
 
-    Assert.assertThat(cache.initialized, Is.is(true));
+    Assertions.assertThat(cache.initialized).isTrue();
   }
 
   @Test
-  public void testInitializingFailure() throws Exception {
-    expectedException.expect(CacheException.class);
-    expectedException.expectMessage("Failed cache initialization for 'test' on 'org.apache.ibatis.mapping.CacheBuilderTest$InitializingFailureCache'");
-
-    new CacheBuilder("test").implementation(InitializingFailureCache.class).build();
+  void testInitializingFailure() {
+    when(() -> new CacheBuilder("test").implementation(InitializingFailureCache.class).build());
+    then(caughtException()).isInstanceOf(CacheException.class)
+      .hasMessage("Failed cache initialization for 'test' on 'org.apache.ibatis.mapping.CacheBuilderTest$InitializingFailureCache'");
   }
 
   @SuppressWarnings("unchecked")
-  private <T> T unwrap(Cache cache){
+  private <T> T unwrap(Cache cache) {
     Field field;
     try {
       field = cache.getClass().getDeclaredField("delegate");
@@ -57,14 +53,13 @@ public class CacheBuilderTest {
     }
     try {
       field.setAccessible(true);
-      return (T)field.get(cache);
+      return (T) field.get(cache);
     } catch (IllegalAccessException e) {
       throw new IllegalStateException(e);
     } finally {
       field.setAccessible(false);
     }
   }
-
 
   private static class InitializingCache extends PerpetualCache implements InitializingObject {
 
@@ -88,7 +83,7 @@ public class CacheBuilderTest {
     }
 
     @Override
-    public void initialize() throws Exception {
+    public void initialize() {
       throw new IllegalStateException("error");
     }
 
