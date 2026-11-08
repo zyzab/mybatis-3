@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2015 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,69 +15,104 @@
  */
 package org.apache.ibatis.submitted.raw_sql_source;
 
-import java.io.Reader;
-import java.sql.Connection;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.Reader;
+import java.util.stream.Stream;
+
+import org.apache.ibatis.BaseDataTest;
 import org.apache.ibatis.io.Resources;
-import org.apache.ibatis.jdbc.ScriptRunner;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.defaults.RawSqlSource;
 import org.apache.ibatis.scripting.xmltags.DynamicSqlSource;
+import org.apache.ibatis.scripting.xmltags.SqlNode;
+import org.apache.ibatis.scripting.xmltags.StaticTextSqlNode;
+import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-public class RawSqlSourceTest {
+class RawSqlSourceTest {
 
   private static SqlSessionFactory sqlSessionFactory;
 
-  @BeforeClass
-  public static void setUp() throws Exception {
+  @BeforeAll
+  static void setUp() throws Exception {
     // create an SqlSessionFactory
-    Reader reader = Resources.getResourceAsReader("org/apache/ibatis/submitted/raw_sql_source/mybatis-config.xml");
-    sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
-    reader.close();
+    try (Reader reader = Resources
+        .getResourceAsReader("org/apache/ibatis/submitted/raw_sql_source/mybatis-config.xml")) {
+      sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
+    }
 
     // populate in-memory database
-    SqlSession session = sqlSessionFactory.openSession();
-    Connection conn = session.getConnection();
-    reader = Resources.getResourceAsReader("org/apache/ibatis/submitted/raw_sql_source/CreateDB.sql");
-    ScriptRunner runner = new ScriptRunner(conn);
-    runner.setLogWriter(null);
-    runner.runScript(reader);
-    reader.close();
-    session.close();
+    BaseDataTest.runScript(sqlSessionFactory.getConfiguration().getEnvironment().getDataSource(),
+        "org/apache/ibatis/submitted/raw_sql_source/CreateDB.sql");
   }
 
   @Test
-  public void shouldUseRawSqlSourceForAnStaticStatement() {
+  void shouldUseRawSqlSourceForAnStaticStatement() {
     test("getUser1", RawSqlSource.class);
   }
 
   @Test
-  public void shouldUseDynamicSqlSourceForAnStatementWithInlineArguments() {
+  void shouldUseDynamicSqlSourceForAnStatementWithInlineArguments() {
     test("getUser2", DynamicSqlSource.class);
   }
 
   @Test
-  public void shouldUseDynamicSqlSourceForAnStatementWithXmlTags() {
+  void shouldUseDynamicSqlSourceForAnStatementWithXmlTags() {
     test("getUser3", DynamicSqlSource.class);
   }
 
   private void test(String statement, Class<? extends SqlSource> sqlSource) {
-    SqlSession sqlSession = sqlSessionFactory.openSession();
-    try {
-      Assert.assertEquals(sqlSource, sqlSession.getConfiguration().getMappedStatement(statement).getSqlSource().getClass());
+    try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
+      Assertions.assertEquals(sqlSource,
+          sqlSession.getConfiguration().getMappedStatement(statement).getSqlSource().getClass());
       String sql = sqlSession.getConfiguration().getMappedStatement(statement).getSqlSource().getBoundSql('?').getSql();
-      Assert.assertEquals("select * from users where id = ?", sql);
+      Assertions.assertEquals("select * from users where id = ?", sql);
       User user = sqlSession.selectOne(statement, 1);
-      Assert.assertEquals("User1", user.getName());
-    } finally {
-      sqlSession.close();
+      Assertions.assertEquals("User1", user.getName());
     }
   }
 
+  @MethodSource
+  @ParameterizedTest
+  void testShrinkWhitespacesInSql(String input, boolean shrinkWhitespaces, String expected) {
+    Configuration config = new Configuration();
+    config.setShrinkWhitespacesInSql(shrinkWhitespaces);
+    String actual = new RawSqlSource(config, input, null).getBoundSql(null).getSql();
+    assertEquals(expected, actual);
+  }
+
+  static Stream<Arguments> testShrinkWhitespacesInSql() {
+    return Stream.of(
+        Arguments.arguments("\t\n\n  SELECT * \n        FROM user\n \t        WHERE user_id = 1\n\t  ", false,
+            "\t\n\n  SELECT * \n        FROM user\n \t        WHERE user_id = 1\n\t  "),
+        Arguments.arguments("\t\n\n SELECT * \n FROM user\n \t WHERE user_id = 1\n\t", true,
+            "SELECT * FROM user WHERE user_id = 1"));
+  }
+
+  @MethodSource
+  @ParameterizedTest
+  void testShrinkWhitespacesInSql_SqlNode(SqlNode input, boolean shrinkWhitespaces, String expected) {
+    Configuration config = new Configuration();
+    config.setShrinkWhitespacesInSql(shrinkWhitespaces);
+    String actual = new RawSqlSource(config, input, null).getBoundSql(null).getSql();
+    assertEquals(expected, actual);
+  }
+
+  static Stream<Arguments> testShrinkWhitespacesInSql_SqlNode() {
+    return Stream.of(
+        Arguments.arguments(
+            new StaticTextSqlNode("\t\n\n  SELECT * \n        FROM user\n \t        WHERE user_id = 1\n\t  "), false,
+            "SELECT * \n        FROM user\n \t        WHERE user_id = 1"),
+        Arguments.arguments(new StaticTextSqlNode("\t\n\n SELECT * \n FROM user\n \t WHERE user_id = 1\n\t"), true,
+            "SELECT * FROM user WHERE user_id = 1"));
+  }
 }

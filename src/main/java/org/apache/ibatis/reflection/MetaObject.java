@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2015 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,11 @@
  */
 package org.apache.ibatis.reflection;
 
+import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.ibatis.reflection.factory.ObjectFactory;
 import org.apache.ibatis.reflection.property.PropertyTokenizer;
@@ -32,13 +34,14 @@ import org.apache.ibatis.reflection.wrapper.ObjectWrapperFactory;
  */
 public class MetaObject {
 
-  private Object originalObject;
-  private ObjectWrapper objectWrapper;
-  private ObjectFactory objectFactory;
-  private ObjectWrapperFactory objectWrapperFactory;
-  private ReflectorFactory reflectorFactory;
+  private final Object originalObject;
+  private final ObjectWrapper objectWrapper;
+  private final ObjectFactory objectFactory;
+  private final ObjectWrapperFactory objectWrapperFactory;
+  private final ReflectorFactory reflectorFactory;
 
-  private MetaObject(Object object, ObjectFactory objectFactory, ObjectWrapperFactory objectWrapperFactory, ReflectorFactory reflectorFactory) {
+  private MetaObject(Object object, ObjectFactory objectFactory, ObjectWrapperFactory objectWrapperFactory,
+      ReflectorFactory reflectorFactory) {
     this.originalObject = object;
     this.objectFactory = objectFactory;
     this.objectWrapperFactory = objectWrapperFactory;
@@ -57,12 +60,12 @@ public class MetaObject {
     }
   }
 
-  public static MetaObject forObject(Object object, ObjectFactory objectFactory, ObjectWrapperFactory objectWrapperFactory, ReflectorFactory reflectorFactory) {
+  public static MetaObject forObject(Object object, ObjectFactory objectFactory,
+      ObjectWrapperFactory objectWrapperFactory, ReflectorFactory reflectorFactory) {
     if (object == null) {
       return SystemMetaObject.NULL_META_OBJECT;
-    } else {
-      return new MetaObject(object, objectFactory, objectWrapperFactory, reflectorFactory);
     }
+    return new MetaObject(object, objectFactory, objectWrapperFactory, reflectorFactory);
   }
 
   public ObjectFactory getObjectFactory() {
@@ -74,7 +77,7 @@ public class MetaObject {
   }
 
   public ReflectorFactory getReflectorFactory() {
-	return reflectorFactory;
+    return reflectorFactory;
   }
 
   public Object getOriginalObject() {
@@ -97,8 +100,16 @@ public class MetaObject {
     return objectWrapper.getSetterType(name);
   }
 
+  public Entry<Type, Class<?>> getGenericSetterType(String name) {
+    return objectWrapper.getGenericSetterType(name);
+  }
+
   public Class<?> getGetterType(String name) {
     return objectWrapper.getGetterType(name);
+  }
+
+  public Entry<Type, Class<?>> getGenericGetterType(String name) {
+    return objectWrapper.getGenericGetterType(name);
   }
 
   public boolean hasSetter(String name) {
@@ -111,34 +122,11 @@ public class MetaObject {
 
   public Object getValue(String name) {
     PropertyTokenizer prop = new PropertyTokenizer(name);
-    if (prop.hasNext()) {
-      MetaObject metaValue = metaObjectForProperty(prop.getIndexedName());
-      if (metaValue == SystemMetaObject.NULL_META_OBJECT) {
-        return null;
-      } else {
-        return metaValue.getValue(prop.getChildren());
-      }
-    } else {
-      return objectWrapper.get(prop);
-    }
+    return objectWrapper.get(prop);
   }
 
   public void setValue(String name, Object value) {
-    PropertyTokenizer prop = new PropertyTokenizer(name);
-    if (prop.hasNext()) {
-      MetaObject metaValue = metaObjectForProperty(prop.getIndexedName());
-      if (metaValue == SystemMetaObject.NULL_META_OBJECT) {
-        if (value == null && prop.getChildren() != null) {
-          // don't instantiate child path if value is null
-          return;
-        } else {
-          metaValue = objectWrapper.instantiatePropertyValue(name, prop, objectFactory);
-        }
-      }
-      metaValue.setValue(prop.getChildren(), value);
-    } else {
-      objectWrapper.set(prop, value);
-    }
+    objectWrapper.set(new PropertyTokenizer(name), value);
   }
 
   public MetaObject metaObjectForProperty(String name) {

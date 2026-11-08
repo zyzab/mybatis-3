@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2016 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,87 +15,170 @@
  */
 package org.apache.ibatis.io;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 
-import org.junit.Test;
-import org.junit.Before;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
-
-public class ExternalResourcesTest {
+class ExternalResourcesTest {
 
   private File sourceFile;
   private File destFile;
   private File badFile;
   private File tempFile;
 
-  /*
-   * @throws java.lang.Exception
-   */
-  @Before
-  public void setUp() throws Exception {
-    tempFile = File.createTempFile("migration", "properties");
+  @BeforeEach
+  void setUp() throws Exception {
+    tempFile = Files.createTempFile("migration", "properties").toFile();
     tempFile.canWrite();
-    sourceFile = File.createTempFile("test1", "sql");
-    destFile = File.createTempFile("test2", "sql");
+    sourceFile = Files.createTempFile("test1", "sql").toFile();
+    destFile = Files.createTempFile("test2", "sql").toFile();
   }
 
   @Test
-  public void testcopyExternalResource() {
-
-    try {
+  void testcopyExternalResource() {
+    assertDoesNotThrow(() -> {
       ExternalResources.copyExternalResource(sourceFile, destFile);
-    } catch (IOException e) {
-    }
-
+    });
   }
 
   @Test
-  public void testcopyExternalResource_fileNotFound() {
+  void testcopyExternalResource_fileNotFound() {
+    badFile = Path.of("/tmp/nofile.sql").toFile();
+    assertThrows(NoSuchFileException.class, () -> ExternalResources.copyExternalResource(badFile, destFile));
+  }
 
-    try {
-      badFile = new File("/tmp/nofile.sql");
+  @Test
+  void testcopyExternalResource_emptyStringAsFile() {
+    Exception e = assertThrows(Exception.class, () -> {
+      badFile = Path.of(" ").toFile();
       ExternalResources.copyExternalResource(badFile, destFile);
-    } catch (IOException e) {
-      assertTrue(e instanceof FileNotFoundException);
-    }
-
+    });
+    assertTrue(e instanceof InvalidPathException || e instanceof NoSuchFileException);
   }
 
   @Test
-  public void testcopyExternalResource_emptyStringAsFile() {
-
-    try {
-      badFile = new File(" ");
-      ExternalResources.copyExternalResource(badFile, destFile);
-    } catch (Exception e) {
-      assertTrue(e instanceof FileNotFoundException);
-    }
-
-  }
-
-  @Test
-  public void testGetConfiguredTemplate() {
+  void getConfiguredTemplate() {
     String templateName = "";
 
-    try {
-      FileWriter fileWriter = new FileWriter(tempFile);
+    try (BufferedWriter fileWriter = Files.newBufferedWriter(tempFile.toPath(), StandardCharsets.UTF_8)) {
       fileWriter.append("new_command.template=templates/col_new_template_migration.sql");
       fileWriter.flush();
-      fileWriter.close();
       templateName = ExternalResources.getConfiguredTemplate(tempFile.getAbsolutePath(), "new_command.template");
       assertEquals("templates/col_new_template_migration.sql", templateName);
     } catch (Exception e) {
-      fail("Test failed with execption: " + e.getMessage());
+      fail("Test failed with exception: " + e.getMessage());
     }
   }
 
-  @After
-  public void cleanUp() {
+  // New test cases for enhanced coverage
+
+  @Test
+  void shouldCopyFileContentCorrectly() throws IOException {
+    File testSource = Files.createTempFile("source", ".txt").toFile();
+    File testDest = Files.createTempFile("dest", ".txt").toFile();
+    String content = "Hello, World!";
+
+    Files.writeString(testSource.toPath(), content);
+
+    ExternalResources.copyExternalResource(testSource, testDest);
+
+    String copiedContent = Files.readString(testDest.toPath());
+    assertEquals(content, copiedContent);
+  }
+
+  @Test
+  void shouldOverwriteExistingDestination() throws IOException {
+    File testSource = Files.createTempFile("source", ".txt").toFile();
+    File testDest = Files.createTempFile("dest", ".txt").toFile();
+    String newContent = "New content";
+    String oldContent = "Old content";
+
+    Files.writeString(testSource.toPath(), newContent);
+    Files.writeString(testDest.toPath(), oldContent);
+
+    ExternalResources.copyExternalResource(testSource, testDest);
+
+    String copiedContent = Files.readString(testDest.toPath());
+    assertEquals(newContent, copiedContent);
+  }
+
+  @Test
+  void shouldCopyEmptyFile() throws IOException {
+    File testSource = Files.createTempFile("empty", ".txt").toFile();
+    File testDest = Files.createTempFile("dest", ".txt").toFile();
+
+    ExternalResources.copyExternalResource(testSource, testDest);
+
+    byte[] sourceBytes = Files.readAllBytes(testSource.toPath());
+    byte[] destBytes = Files.readAllBytes(testDest.toPath());
+    assertArrayEquals(sourceBytes, destBytes);
+  }
+
+  @Test
+  void shouldCopyFileWithBinaryContent() throws IOException {
+    File testSource = Files.createTempFile("binary", ".bin").toFile();
+    File testDest = Files.createTempFile("dest", ".bin").toFile();
+    byte[] binaryData = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, (byte) 255, (byte) 128, 64, 32, 16 };
+
+    Files.write(testSource.toPath(), binaryData);
+
+    ExternalResources.copyExternalResource(testSource, testDest);
+
+    byte[] copiedData = Files.readAllBytes(testDest.toPath());
+    assertArrayEquals(binaryData, copiedData);
+  }
+
+  @Test
+  void shouldThrowExceptionWhenSourceIsNull() throws IOException {
+    assertThrows(NullPointerException.class, () -> ExternalResources.copyExternalResource(null, destFile));
+  }
+
+  @Test
+  void shouldCopyFileWithSizeExactly4096Bytes() throws IOException {
+    File testSource = Files.createTempFile("exact4096", ".txt").toFile();
+    File testDest = Files.createTempFile("dest", ".txt").toFile();
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < 4096; i++) {
+      builder.append("x");
+    }
+    String content = builder.toString();
+
+    Files.writeString(testSource.toPath(), content);
+
+    ExternalResources.copyExternalResource(testSource, testDest);
+
+    assertEquals(content, Files.readString(testDest.toPath()));
+    assertEquals(4096, testDest.length());
+  }
+
+  @Test
+  void shouldThrowExceptionWhenDestPathContainsNonExistentDirectory() throws IOException {
+    File testSource = Files.createTempFile("source", ".txt").toFile();
+    Path nonExistentDir = Path.of(System.getProperty("java.io.tmpdir"), "nonexistent_" + System.currentTimeMillis(),
+        "dest.txt");
+    File testDest = nonExistentDir.toFile();
+
+    assertThrows(Exception.class, () -> ExternalResources.copyExternalResource(testSource, testDest));
+  }
+
+  @AfterEach
+  void cleanUp() {
     sourceFile.delete();
     destFile.delete();
     tempFile.delete();

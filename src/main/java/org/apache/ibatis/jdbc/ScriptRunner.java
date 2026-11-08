@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2016 the original author or authors.
+/*
+ *    Copyright 2009-2023 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,24 +18,33 @@ package org.apache.ibatis.jdbc;
 import java.io.BufferedReader;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
+ * This is an internal testing utility.<br>
+ * You are welcome to use this class for your own purposes,<br>
+ * but if there is some feature/enhancement you need for your own usage,<br>
+ * please make and modify your own copy instead of sending us an enhancement request.<br>
+ *
  * @author Clinton Begin
  */
 public class ScriptRunner {
 
-  private static final String LINE_SEPARATOR = System.getProperty("line.separator", "\n");
+  private static final String LINE_SEPARATOR = System.lineSeparator();
 
   private static final String DEFAULT_DELIMITER = ";";
 
-  private Connection connection;
+  private static final Pattern DELIMITER_PATTERN = Pattern
+      .compile("^\\s*((--)|(//))?\\s*(//)?\\s*@DELIMITER\\s+([^\\s]+)", Pattern.CASE_INSENSITIVE);
+
+  private final Connection connection;
 
   private boolean stopOnError;
   private boolean throwWarning;
@@ -75,6 +84,11 @@ public class ScriptRunner {
   }
 
   /**
+   * Sets the escape processing.
+   *
+   * @param escapeProcessing
+   *          the new escape processing
+   *
    * @since 3.1.1
    */
   public void setEscapeProcessing(boolean escapeProcessing) {
@@ -137,7 +151,7 @@ public class ScriptRunner {
       BufferedReader lineReader = new BufferedReader(reader);
       String line;
       while ((line = lineReader.readLine()) != null) {
-        command = handleLine(command, line);
+        handleLine(command, line);
       }
       commitConnection();
       checkForMissingLineTerminator(command);
@@ -148,6 +162,10 @@ public class ScriptRunner {
     }
   }
 
+  /**
+   * @deprecated Since 3.5.4, this method is deprecated. Please close the {@link Connection} outside of this class.
+   */
+  @Deprecated
   public void closeConnection() {
     try {
       connection.close();
@@ -192,17 +210,16 @@ public class ScriptRunner {
     }
   }
 
-  private StringBuilder handleLine(StringBuilder command, String line) throws SQLException, UnsupportedEncodingException {
+  private void handleLine(StringBuilder command, String line) throws SQLException {
     String trimmedLine = line.trim();
     if (lineIsComment(trimmedLine)) {
-        final String cleanedString = trimmedLine.substring(2).trim().replaceFirst("//", "");
-        if(cleanedString.toUpperCase().startsWith("@DELIMITER")) {
-            delimiter = cleanedString.substring(11,12);
-            return command;
-        }
+      Matcher matcher = DELIMITER_PATTERN.matcher(trimmedLine);
+      if (matcher.find()) {
+        delimiter = matcher.group(5);
+      }
       println(trimmedLine);
     } else if (commandReadyToExecute(trimmedLine)) {
-      command.append(line.substring(0, line.lastIndexOf(delimiter)));
+      command.append(line, 0, line.lastIndexOf(delimiter));
       command.append(LINE_SEPARATOR);
       println(command);
       executeStatement(command.toString());
@@ -211,7 +228,6 @@ public class ScriptRunner {
       command.append(line);
       command.append(LINE_SEPARATOR);
     }
-    return command;
   }
 
   private boolean lineIsComment(String trimmedLine) {
@@ -224,59 +240,63 @@ public class ScriptRunner {
   }
 
   private void executeStatement(String command) throws SQLException {
-    boolean hasResults = false;
-    Statement statement = connection.createStatement();
-    statement.setEscapeProcessing(escapeProcessing);
-    String sql = command;
-    if (removeCRs) {
-      sql = sql.replaceAll("\r\n", "\n");
-    }
-    if (stopOnError) {
-      hasResults = statement.execute(sql);
-      if (throwWarning) {
-        // In Oracle, CRATE PROCEDURE, FUNCTION, etc. returns warning
-        // instead of throwing exception if there is compilation error.
-        SQLWarning warning = statement.getWarnings();
-        if (warning != null) {
-          throw warning;
-        }
+    try (Statement statement = connection.createStatement()) {
+      statement.setEscapeProcessing(escapeProcessing);
+      String sql = command;
+      if (removeCRs) {
+        sql = sql.replace("\r\n", "\n");
       }
-    } else {
       try {
-        hasResults = statement.execute(sql);
+        boolean hasResults = statement.execute(sql);
+        // DO NOT try to 'improve' the condition even if IDE tells you to!
+        // It's important that getUpdateCount() is called here.
+        while (!(!hasResults && statement.getUpdateCount() == -1)) {
+          checkWarnings(statement);
+          printResults(statement, hasResults);
+          hasResults = statement.getMoreResults();
+        }
+      } catch (SQLWarning e) {
+        throw e;
       } catch (SQLException e) {
+        if (stopOnError) {
+          throw e;
+        }
         String message = "Error executing: " + command + ".  Cause: " + e;
         printlnError(message);
       }
     }
-    printResults(statement, hasResults);
-    try {
-      statement.close();
-    } catch (Exception e) {
-      // Ignore to workaround a bug in some connection pools
+  }
+
+  private void checkWarnings(Statement statement) throws SQLException {
+    if (!throwWarning) {
+      return;
+    }
+    // In Oracle, CREATE PROCEDURE, FUNCTION, etc. returns warning
+    // instead of throwing exception if there is compilation error.
+    SQLWarning warning = statement.getWarnings();
+    if (warning != null) {
+      throw warning;
     }
   }
 
   private void printResults(Statement statement, boolean hasResults) {
-    try {
-      if (hasResults) {
-        ResultSet rs = statement.getResultSet();
-        if (rs != null) {
-          ResultSetMetaData md = rs.getMetaData();
-          int cols = md.getColumnCount();
-          for (int i = 0; i < cols; i++) {
-            String name = md.getColumnLabel(i + 1);
-            print(name + "\t");
-          }
-          println("");
-          while (rs.next()) {
-            for (int i = 0; i < cols; i++) {
-              String value = rs.getString(i + 1);
-              print(value + "\t");
-            }
-            println("");
-          }
+    if (!hasResults) {
+      return;
+    }
+    try (ResultSet rs = statement.getResultSet()) {
+      ResultSetMetaData md = rs.getMetaData();
+      int cols = md.getColumnCount();
+      for (int i = 0; i < cols; i++) {
+        String name = md.getColumnLabel(i + 1);
+        print(name + "\t");
+      }
+      println("");
+      while (rs.next()) {
+        for (int i = 0; i < cols; i++) {
+          String value = rs.getString(i + 1);
+          print(value + "\t");
         }
+        println("");
       }
     } catch (SQLException e) {
       printlnError("Error printing results: " + e.getMessage());

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-       Copyright 2009-2016 the original author or authors.
+       Copyright 2009-2026 the original author or authors.
 
        Licensed under the Apache License, Version 2.0 (the "License");
        you may not use this file except in compliance with the License.
        You may obtain a copy of the License at
 
-          http://www.apache.org/licenses/LICENSE-2.0
+          https://www.apache.org/licenses/LICENSE-2.0
 
        Unless required by applicable law or agreed to in writing, software
        distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 
 -->
 <document xmlns="http://maven.apache.org/XDOC/2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:schemaLocation="http://maven.apache.org/XDOC/2.0 http://maven.apache.org/xsd/xdoc-2.0.xsd">
+      xsi:schemaLocation="http://maven.apache.org/XDOC/2.0 https://maven.apache.org/xsd/xdoc-2.0.xsd">
 
   <properties>
     <title>MyBatis 3 | Mapper XML ファイル</title>
@@ -130,10 +130,9 @@ ps.setInt(1,id);]]></source>
   parameterType="int"
   parameterMap="deprecated"
   resultType="hashmap"
-  resultMap="personResultMap"
   flushCache="false"
   useCache="true"
-  timeout="10000"
+  timeout="10"
   fetchSize="256"
   statementType="PREPARED"
   resultSetType="FORWARD_ONLY">]]></source>
@@ -213,7 +212,7 @@ ps.setInt(1,id);]]></source>
             <tr>
               <td><code>resultSetType</code></td>
               <td>
-                <code>FORWARD_ONLY</code>, <code>SCROLL_SENSITIVE</code>, <code>SCROLL_INSENSITIVE</code> のいずれかを指定します。デフォルトは未指定（ドライバー依存）です。
+                <code>FORWARD_ONLY</code>, <code>SCROLL_SENSITIVE</code>, <code>SCROLL_INSENSITIVE</code>, <code>DEFAULT</code> のいずれかを指定します。未指定の場合は設定済みの <code>defaultResultSetType</code> が適用され、<code>DEFAULT</code> を指定すると JDBC ドライバーのデフォルトが使用されます。
               </td>
             </tr>
             <tr>
@@ -233,11 +232,17 @@ ps.setInt(1,id);]]></source>
               <td>複数の ResultSet を利用する場合にのみ有効です。ステートメントが返す ResultSet にそれぞれ任意の名前を付けてリストアップします。名前はカンマで区切ります。
               </td>
             </tr>
+            <tr>
+              <td><code>affectData</code></td>
+              <td>ResultSet を返す INSERT, UPDATE, DELETE 文を記述する場合に true をセットします。これによりトランザクション制御が正しく実行されるようになります。<a href="./java-api.html#transaction-control-methods">トランザクションを制御するメソッド</a> も参照してください。 デフォルト： <code>false</code> （3.5.12 以降）
+              </td>
+            </tr>
           </tbody>
         </table>
       </subsection>
 
       <subsection name="insert, update and delete">
+        <a name="insert_update_and_delete"/>
         <p>
           データを変更するステートメントである insert, update, delete は、非常によく似た実装となっています。
         </p>
@@ -434,7 +439,7 @@ ps.setInt(1,id);]]></source>
             <tr>
               <td>resultType</td>
               <td>
-                結果の型を指定します。ほとんどの場合、MyBatis は自動的に型を推測することができますが、念のため設定しておいても害はありません。文字列も含めて、任意の単純型を指定することができます。複数の列が自動生成対象となっている場合、対応するプロパティを持つクラスあるいは Map を指定することができます。
+                結果の型を指定します。MyBatis は <code>selectKey</code> の結果型を自動的には推測しないため、明示的な指定が必要です。文字列も含めて、任意の単純型を指定することができます。複数の列が自動生成対象となっている場合、対応するプロパティを持つクラスあるいは Map を指定することができます。
               </td>
             </tr>
             <tr>
@@ -453,6 +458,18 @@ ps.setInt(1,id);]]></source>
             </tr>
           </tbody>
         </table>
+
+        <p>
+          例外として、INSERT, UPDATE, DELETE 文から ResultSet を返す SQL 文（PostgreSQL, MariaDB の <code>RETURNING</code> , MS SQL Server の <code>OUTPUT</code> など）で結果をマップするためには <code><![CDATA[<select />]]></code> を使用する必要があります。
+        </p>
+
+        <source><![CDATA[<select id="insertAndGetAuthor" resultType="domain.blog.Author"
+      affectData="true" flushCache="true">
+  insert into Author (username, password, email, bio)
+  values (#{username}, #{password}, #{email}, #{bio})
+  returning id, username, password, email, bio
+</select>]]></source>
+
       </subsection>
 
       <subsection name="sql">
@@ -505,7 +522,7 @@ ps.setInt(1,id);]]></source>
           例：
         </p>
 
-        <source><![CDATA[<select id="selectUsers" resultType="User">
+        <source><![CDATA[<select id="selectUsers" parameterType="int" resultType="User">
   select id, username, password
   from users
   where id = #{id}
@@ -572,7 +589,7 @@ ps.setInt(1,id);]]></source>
           MyBatis ではより高度な struct のようなデータ型もサポートされていますが、OUT パラメーターを登録するときに型名を指定する必要があります。
         </p>
 
-        <source><![CDATA[#{middleInitial, mode=OUT, jdbcType=STRUCT, jdbcTypeName=MY_TYPE, resultMap=departmentResultMap}]]></source>
+        <source><![CDATA[#{middleInitial, mode=OUT, jdbcType=STRUCT, jdbcTypeName=MY_TYPE}]]></source>
 
         <p>
           このように多くの強力なオプションがあるわけですが、ほとんどの場合、単純にプロパティ名を指定すれば、後は MyBatis がよきに計らってくれるはずです。
@@ -596,6 +613,41 @@ ps.setInt(1,id);]]></source>
 
         <p>
           この場合、MyBatis は引数として渡された文字列を変更したりエスケープしたりしません。
+        </p>
+
+        <p>
+          文字列代入は、メタ情報(例：テーブル名やカラム名など)をSQLステートメントへ動的に埋め込みたい場合に非常に便利な仕組みです。
+          例えば、任意のカラム値に一致するレコードを取得する場合に、以下のようにカラム毎にメソッドを用意するのではなく、
+          <source><![CDATA[
+@Select("select * from user where id = #{id}")
+User findById(@Param("id") long id);
+
+@Select("select * from user where name = #{name}")
+User findByName(@Param("name") String name);
+
+@Select("select * from user where email = #{email}")
+User findByEmail(@Param("email") String email);
+
+// and more "findByXxx" method
+]]></source>
+
+          指定したカラムの値に一致するレコードを取得するメソッドを一つ用意するだけで、同じことを実現することができます。
+
+          <source><![CDATA[
+@Select("select * from user where ${column} = #{value}")
+User findByColumn(@Param("column") String column, @Param("value") Object value);
+]]></source>
+          <code>${column}</code> は指定した文字列(カラム名)が直接代入され、<code>#{value}</code> はバインド変数として扱われるため、
+          以下のように使用することができます。
+          <source><![CDATA[
+User userOfId1 = userMapper.findByColumn("id", 1L);
+User userOfNameKid = userMapper.findByColumn("name", "kid");
+User userOfEmail = userMapper.findByColumn("email", "noone@nowhere.com");
+]]></source>
+        </p>
+
+        <p>
+          この考え方はテーブル名にも適用することができます。
         </p>
 
         <p>
@@ -632,7 +684,7 @@ public class User {
   private int id;
   private String username;
   private String hashedPassword;
-  
+
   public int getId() {
     return id;
   }
@@ -704,8 +756,8 @@ public class User {
 
         <source><![CDATA[<resultMap id="userResultMap" type="User">
   <id property="id" column="user_id" />
-  <result property="username" column="username"/>
-  <result property="password" column="password"/>
+  <result property="username" column="user_name"/>
+  <result property="hashedPassword" column="hashed_password"/>
 </resultMap>]]></source>
 
         <p>
@@ -940,10 +992,7 @@ public class User {
             <tr>
               <td>jdbcType</td>
               <td>
-                サポートされている JDBC データ型（この後のテーブルにリストがあります）を指定します。
-                JDBC データ型の指定が必須となるのは、insert, update, delete の各ステートメントで null が許可されている列を指定した場合だけです。
-                これは JDBC の仕様で MyBatis の仕様ではありません。
-                ですから、直接 JDBC を使ったコードを書く場合でも null が許可されている列に対しては、やはりデータ型を指定する必要があります。
+                結果列の JDBC データ型を指定します。MyBatis がこのマッピングに用いる TypeHandler を Java 型と合わせて選択する際に必要な場合があります。
               </td>
             </tr>
             <tr>
@@ -1004,14 +1053,25 @@ public class User {
             <td>CURSOR</td>
             <td>ARRAY</td>
           </tr>
+          <tr>
+            <td>STRUCT</td>
+            <td>JAVA_OBJECT</td>
+            <td>DISTINCT</td>
+            <td>REF</td>
+            <td>DATALINK</td>
+            <td>ROWID</td>
+          </tr>
+          <tr>
+            <td>LONGNVARCHAR</td>
+            <td>SQLXML</td>
+            <td>DATETIMEOFFSET</td>
+            <td>TIME_WITH_TIMEZONE</td>
+            <td>TIMESTAMP_WITH_TIMEZONE</td>
+            <td></td>
+          </tr>
         </table>
 
         <h4>constructor</h4>
-
-        <source><![CDATA[<constructor>
-   <idArg column="id" javaType="int"/>
-   <arg column="username" javaType="String"/>
-</constructor>]]></source>
 
         <p>
           ほとんどの DTO (Data Transfer Object) やドメインモデルではプロパティを使って値を設定することができますが、時にはイミュータブルなクラスを使いたい場合もあるかも知れません。
@@ -1027,22 +1087,36 @@ public class User {
 
         <source><![CDATA[public class User {
    //...
-   public User(int id, String username) {
+   public User(Integer id, String username, int age) {
   //...
   }
 //...
 }]]></source>
 
-        <p>
-          このコンストラクタに結果をインジェクトするためには、パラメーターの型によってコンストラクタを識別する必要があります。
-          Java では引数の名前を取得する方法がありませんので、constructor 要素を定義する場合は引数を正しい順番に並べ、適切なデータ型を指定するようにしてください。
-        </p>
-
+        <p>コンストラクタ経由で値をマップするためには、指定された引数にマッチするコンストラクタを特定する必要があります。
+          下記の例では、MyBatis は３つの引数 <code>java.lang.Integer</code>, <code>java.lang.String</code>, <code>int</code> をこの順番で持つコンストラクタを探します。</p>
 
         <source><![CDATA[<constructor>
    <idArg column="id" javaType="int"/>
    <arg column="username" javaType="String"/>
+   <arg column="age" javaType="_int"/>
 </constructor>]]></source>
+
+        <p>
+          上記の指定方法では引数の型を順番通りに並べる必要がありますが、引数の多いコンストラクタを扱うのには向いていません。<br />
+          3.4.3 以降では、引数名を指定することによって arg 要素を順不同で記述できるようになりました。引数を名前で指定するためには、各引数に <code>@Param</code> アノテーションを追加するか、プロジェクトを '-parameters' オプション付きでコンパイルし、<code>useActualParamName</code> に true （デフォルト値です）を設定します。
+          下記の指定では２番めと３番目の引数の順番がコンストラクタの宣言と異なりますが、引数名が指定されているので正しく動作します。
+        </p>
+
+        <source><![CDATA[<constructor>
+   <idArg column="id" javaType="int" name="id" />
+   <arg column="age" javaType="_int" name="age" />
+   <arg column="username" javaType="String" name="username" />
+</constructor>]]></source>
+
+        <p>
+          引数と同じ名前、同じ型を持つ書き込み可能なプロパティが存在する場合 <code>javaType</code> は省略可能です。
+        </p>
 
         <p>
           それ以外の属性とルールについては通常の id, result 要素と同じです。
@@ -1073,10 +1147,7 @@ public class User {
             <tr>
               <td>jdbcType</td>
               <td>
-                サポートされている JDBC データ型（この後のテーブルにリストがあります）を指定します。
-                JDBC データ型の指定が必須となるのは、insert, update, delete の各ステートメントで null が許可されている列を指定した場合だけです。
-                これは JDBC の仕様で MyBatis の仕様ではありません。
-                ですから、直接 JDBC を使ったコードを書く場合でも null が許可されている列に対しては、やはりデータ型を指定する必要があります。
+                結果列の JDBC データ型を指定します。MyBatis がこのマッピングに用いる TypeHandler を Java 型と合わせて選択する際に必要な場合があります。
               </td>
             </tr>
             <tr>
@@ -1105,8 +1176,132 @@ public class User {
                 詳細は association 要素の説明を参照してください。
               </td>
             </tr>
+            <tr>
+              <td><code>name</code></td>
+              <td>
+                コンストラクタ引数の名前を指定します。引数名を指定することで arg 要素を順不同で記述できるようになります。詳細は上記の説明を参照してください。
+                導入されたバージョン: 3.4.3
+              </td>
+            </tr>
           </tbody>
         </table>
+
+<h5>コレクションや複雑なオブジェクトを引数に含むコンストラクタに対して、ネストされた結果をマッピングする</h5>
+
+<p>以降のセクションで <code>association</code> と <code>collection</code> について説明しますが、バージョン 3.6.0 以降ではコンストラクタの引数としてコレクションを指定できるようになりました。</p>
+
+<p>次のクラスを例にして説明します。</p>
+
+<source><![CDATA[public class User {
+   //...
+   public User(Integer id, String username, List<UserRole> userRoles) {
+     //...
+   }
+}
+
+public class UserRole {
+    // ...
+    public UserRole(Integer id, String role) {
+      // ...
+    }
+}
+]]></source>
+
+<p>クエリがネストされた結果を返す場合、<code>User</code> のコンストラクタ引数に含まれているコレクション <code>List&lt;UserRole&gt;</code> をマッピングするためには、下記のような ResultMap を定義します。</p>
+<p>MyBatis は <code>UserRole</code> が全て読み込まれてから <code>User</code> のコンストラクタを呼び出します。つまり、<code>User</code> をイミュータブルなオブジェクトとして定義することもできるということです。</p>
+
+<source><![CDATA[<resultMap id="userResultMap" type="User">
+  <constructor>
+    <idArg column="id" javaType="int" />
+    <arg column="username" javaType="String" />
+    <arg javaType="List" resultMap="userRoleResultMap" columnPrefix="role_"/>
+  </constructor>
+</resultMap>
+]]></source>
+
+<p>上記の ResultMap で参照している <code>UserRole</code> 用の ResultMap でもコンストラクタマッピングを使用すれば、<code>UserRole</code> もイミュータブルにできます。</p>
+
+<source><![CDATA[<resultMap id="userRoleResultMap" type="UserRole">
+  <constructor>
+    <idArg column="id" javaType="int" />
+    <arg column="role" javaType="String" />
+  </constructor>
+</resultMap>
+]]></source>
+
+<p>このマッピングを実現するためには、結果セットが正しい順番でソートされていることが前提となるので、クエリで適切な <code>ORDER BY</code> 句を指定した上で、<code>&lt;select&gt;</code> 要素の <code>resultOrdered</code> 属性に <code>true</code> を設定してください。</p>
+
+<source><![CDATA[<select id="getAllUsers" resultMap="userResultMap" resultOrdered="true">
+    select
+      u.id,
+      u.username,
+      r.id as role_id,
+      r.role as role_role
+    from user u
+      left join user_role ur on u.id = ur.user_id
+      left join role r on r.id = ur.role_id
+    order by u.id, r.id
+</select>
+]]></source>
+
+<p>下記のように正しくソートされた結果セットが返ってくれば、期待通りにマッピングすることができます。</p>
+
+<table class="table table-striped">
+<thead>
+<tr class="a">
+<th>row_nr</th>
+<th>u.id</th>
+<th>u.username</th>
+<th>r.id</th>
+<th>r.role</th></tr></thead><tbody>
+<tr class="b">
+<td>1</td>
+<td>1</td>
+<td>John</td>
+<td>1</td>
+<td>Admins</td></tr>
+<tr class="a">
+<td>2</td>
+<td>1</td>
+<td>John</td>
+<td>2</td>
+<td>Users</td></tr>
+<tr class="b">
+<td>3</td>
+<td>2</td>
+<td>Jack</td>
+<td>null</td>
+<td>null</td></tr>
+<tr class="a">
+<td>4</td>
+<td>3</td>
+<td>Peter</td>
+<td>2</td>
+<td>Users</td></tr>
+<tr class="b">
+<td>5</td>
+<td>3</td>
+<td>Peter</td>
+<td>3</td>
+<td>Maintainers</td></tr>
+<tr class="a">
+<td>6</td>
+<td>3</td>
+<td>Peter</td>
+<td>4</td>
+<td>Approvers</td></tr></tbody>
+</table>
+
+<p>作成される <code>User</code> オブジェクトは下記のようになります。</p>
+
+<source><![CDATA[User{username=John, roles=[Admins, Users]}
+User{username=Jack, roles=[]}
+User{username=Peter, roles=[Users, Maintainers, Approvers]}
+]]></source>
+
+<p>仮に、誤ったソート条件が指定されていて５行目のデータが１行目の直後に出現するようなクエリを実行してしまうと、全ての <code>UserRole</code> を読み込む前に <code>John</code> ユーザのコンストラクタが呼び出されてしまうので、期待通りの結果を得ることはできません。</p>
+
+<p>コンストラクタ引数にコレクションを含むオブジェクトを使う場合は、完全にイミュータブルなオブジェクトとして定義してください。ResultMap にコンストラクタマッピングとプロパティマッピングが混在する ResultMap は正しく動作しない可能性があります。</p>
 
         <h4>association</h4>
 
@@ -1167,10 +1362,7 @@ public class User {
             <tr>
               <td>jdbcType</td>
               <td>
-                サポートされている JDBC データ型（この後のテーブルにリストがあります）を指定します。
-                JDBC データ型の指定が必須となるのは、insert, update, delete の各ステートメントで null が許可されている列を指定した場合だけです。
-                これは JDBC の仕様で MyBatis の仕様ではありません。
-                ですから、直接 JDBC を使ったコードを書く場合でも null が許可されている列に対しては、やはりデータ型を指定する必要があります。
+                結果列の JDBC データ型を指定します。MyBatis がこのマッピングに用いる TypeHandler を Java 型と合わせて選択する際に必要な場合があります。
               </td>
             </tr>
             <tr>
@@ -1302,7 +1494,7 @@ public class User {
               <td>
                 ネストされた結果をマッピングする際、デフォルトでは子オブジェクトのプロパティに対応する列のうち一つでも null でない値がセットされているものがあれば子オブジェクトが生成されます。notNullColumn に列名（複数可）を指定しておくと、指定された列に null 以外の値がセットされた場合にのみ子オブジェクトが生成されます。デフォルト：未指定
               </td>
-            </tr>            
+            </tr>
             <tr>
               <td><code>autoMapping</code></td>
               <td>このプロパティに結果をマッピングする際、自動マッピングを使用するかどうかを true / false で指定します。ここでの指定はグローバルな設定（autoMappingBehavior）より優先されます。この設定は別の場所で定義されている ResultMap には適用されませんので、<code>select</code> や <code>resultMap</code> が指定されている場合は無効となります。デフォルト：未指定
@@ -1423,6 +1615,31 @@ public class User {
     columnPrefix="co_" />
 </resultMap>]]></source>
 
+
+<h4>ネストされたカーソルを association にマッピングする</h4>
+
+<p>データベースによっては列の値として <code>java.sql.ResultSet</code> 返すことができます。<br />
+このような結果をマッピングする例を説明します。</p>
+
+<source><![CDATA[<resultMap id="blogResult" type="Blog">
+  <id property="id" column="id" />
+  <result property="title" column="title" />
+  <association property="author" column="author" jdbcType="CURSOR">
+    <id property="id" column="id" />
+    <result property="username" column="username" />
+  </association>
+</resultMap>
+
+<select id="selectBlog" resultMap="blogResult">
+  select b.id, b.title, cursor(
+    select a.id, a.username from author a where b.author_id = a.id
+  ) author from blog b
+</select>]]></source>
+
+<p>上の章の例との重要な違いは、<code>&lt;association&gt;</code> 要素の <code>jdbcType</code> 属性に <code>CURSOR</code> を指定している点です。<br />
+これによって、<code>author</code> 列の値をネストされたカーソルとしてマッピングすることができます。</p>
+
+
         <h4>複数の ResultSet を association にマッピングする</h4>
 
         <table>
@@ -1451,9 +1668,9 @@ public class User {
             </tr>
           </tbody>
         </table>
-        
+
         <p>バージョン 3.2.3 から、N+1 セレクト問題を解決する新しい方法が追加されました。</p>
-         
+
         <p>データベースによってはストアドプロシージャから複数の ResultSet を返すことができます。この機能を利用すると、テーブルの結合（Join）を使わず一度の問い合わせで互いに関連する複数のデータを取得することができます。</p>
 
         <p>以下の例では、ストアドプロシージャが２つの ResultSet を返します。１つめの ResultSet には複数の Blog のデータが含まれており、２つめの ResultSet には複数の Author のデータが含まれています。</p>
@@ -1524,7 +1741,7 @@ SELECT * FROM AUTHOR WHERE ID = #{id}]]></source>
   SELECT * FROM BLOG WHERE ID = #{id}
 </select>
 
-<select id="selectPostsForBlog" resultType="Blog">
+<select id="selectPostsForBlog" resultType="Post">
   SELECT * FROM POST WHERE BLOG_ID = #{id}
 </select>]]></source>
 
@@ -1564,7 +1781,7 @@ SELECT * FROM AUTHOR WHERE ID = #{id}]]></source>
   B.author_id as blog_author_id,
   P.id as post_id,
   P.subject as post_subject,
-  P.body as post_body,
+  P.body as post_body
   from Blog B
   left outer join Post P on B.id = P.blog_id
   where B.id = #{id}
@@ -1604,8 +1821,31 @@ SELECT * FROM AUTHOR WHERE ID = #{id}]]></source>
   <result property="body" column="body"/>
 </resultMap>]]></source>
 
+
+<h4>ネストされたカーソルを collection にマッピングする</h4>
+
+<p>当然ですが、ネストされたカーソルが複数の値を返す場合もあります。<br />
+先に説明した <code>&lt;association&gt;</code> の場合と同様、 <code>&lt;collection&gt;</code> 要素に <code>jdbcType="CURSOR"</code> を指定してください。</p>
+
+<source><![CDATA[<resultMap id="blogResult" type="Blog">
+  <id property="id" column="id" />
+  <result property="title" column="title" />
+  <collection property="posts" column="posts" jdbcType="CURSOR">
+    <id property="id" column="id" />
+    <result property="subject" column="subject" />
+    <result property="body" column="body" />
+  </collection>
+</resultMap>
+
+<select id="selectBlog" resultMap="blogResult">
+  select b.id, b.title, cursor(
+    select p.id, p.subject, p.body from post p where p.blog_id = b.id
+  ) posts from blog b
+</select>]]></source>
+
+
         <h4>複数の ResultSets を collection にマッピングする</h4>
-        
+
         <p>
           association で説明したのと同様に、２つの ResultSet を返すストアドプロシージャを呼び出すことができます。１つ目の ResultSet には Blog のリスト、２つ目の ResultSet には Post のリストが含まれているものとします。
         </p>
@@ -1616,10 +1856,10 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
 
        <p>ストアドプロシージャを実行する select 要素の <code>resultSets</code> 属性で、それぞれの ResultSet に名前を付けておく必要があります（カンマ区切り）。ここでは、それぞれ blogs, posts としています。</p>
 
-        <source><![CDATA[<select id="selectBlog" resultSets="blogs,posts" resultMap="blogResult">
+        <source><![CDATA[<select id="selectBlog" resultSets="blogs,posts" resultMap="blogResult" statementType="CALLABLE">
   {call getBlogsAndPosts(#{id,jdbcType=INTEGER,mode=IN})}
 </select>]]></source>
-        
+
         <p>以下の resultMap では、posts に含まれる Post が、対応する Blog にマッピングされます。</p>
 
         <source><![CDATA[<resultMap id="blogResult" type="Blog">
@@ -1720,17 +1960,17 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
   <result property="model" column="model"/>
   <result property="color" column="color"/>
   <discriminator javaType="int" column="vehicle_type">
-    <case value="1" resultType="carResult">
+    <case value="1" resultType="Car">
       <result property="doorCount" column="door_count" />
     </case>
-    <case value="2" resultType="truckResult">
+    <case value="2" resultType="Truck">
       <result property="boxSize" column="box_size" />
       <result property="extendedCab" column="extended_cab" />
     </case>
-    <case value="3" resultType="vanResult">
+    <case value="3" resultType="Van">
       <result property="powerSlidingDoor" column="power_sliding_door" />
     </case>
-    <case value="4" resultType="suvResult">
+    <case value="4" resultType="SUV">
       <result property="allWheelDrive" column="all_wheel_drive" />
     </case>
   </discriminator>
@@ -1745,6 +1985,7 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
       </subsection>
 
       <subsection name="自動マッピング">
+        <a name="auto-mapping"/>
 
         <p>
           前章では、シンプルなケースでは MyBatis の自動マッピングが利用できるということと、複雑なケースではあなた自身で Result Map を記述する必要があるということを説明しました。
@@ -1761,7 +2002,7 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
           通常、データベースの列名は英数字と単語を区切るアンダースコアで定義され、Java のプロパティはキャメルケースで定義されるのが一般的です。
           <code>mapUnderscoreToCamelCase</code> に true に設定すると、この一般的な命名規則に基づいて自動マッピングを適用することができます。
         </p>
-        
+
         <p>
           Result Map が指定されている場合でも自動マッピングは動作します。この場合、ResultSet に含まれる列のうち、各 Result Map で明示的にマッピングが指定されていない列が自動マッピングの対象となります。
           次の例では、<i>hashed_password</i> 列が password プロパティにマップされ、<i>id</i> と <i>userName</i> 列が自動マッピングの対象となります。
@@ -1777,13 +2018,13 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
 </select>]]></source>
 
         <source><![CDATA[<resultMap id="userResultMap" type="User">
-  <result property="password" column="hashed_password"/>
+  <result property="hashedPassword" column="hashed_password"/>
 </resultMap>]]></source>
 
         <p>
           自動マッピングには３つのレベルがあります。
         </p>
-        
+
         <ul>
           <li>
             <code>NONE</code> - 自動マッピングを無効化します。明示的にマッピングが指定されたプロパティにのみ値がセットされます。
@@ -1801,12 +2042,12 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
           <code>FULL</code> が指定されていると、JOIN 句によって複数のエンティティに対する結果が一行に結合されているような場合に自動マッピングによって意図しないマッピングが実行されてしまう場合があります。
           次の例を見てください。
         </p>
-        
+
         <source><![CDATA[<select id="selectBlog" resultMap="blogResult">
   select
     B.id,
     B.title,
-    A.username,
+    A.username
   from Blog B left outer join Author A on B.author_id = A.id
   where B.id = #{id}
 </select>]]></source>
@@ -1818,7 +2059,7 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
 <resultMap id="authorResult" type="Author">
   <result property="username" column="author_username"/>
 </resultMap>]]></source>
-        
+
         <p>
           この Result Map では、<i>Blog</i> と <i>Author</i> の両方が自動マッピングの対象となりますが、<i>Author</i> に <i>id</i> というプロパティがあり、ResultSet に <i>id</i> という列が含まれているため、Author の id に Blog の id がセットされることになります。
           自動マッピングで <code>FULL</code> を指定する場合は、こうした意図しないマッピングが行われないように注意する必要があります。
@@ -1829,9 +2070,9 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
         </p>
 
         <source><![CDATA[<resultMap id="userResultMap" type="User" autoMapping="false">
-  <result property="password" column="hashed_password"/>
+  <result property="hashedPassword" column="hashed_password"/>
 </resultMap>]]></source>
-              
+
       </subsection>
 
       <subsection name="cache">
@@ -1852,13 +2093,17 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
         </p>
 
         <ul>
-          <li>この SQL マップファイルに含まれる select ステートメントの結果は全てキャッシュされます。</li>
+          <li><code>cacheEnabled</code> が true で、ステートメントの <code>useCache</code> も true の場合、カスタム ResultHandler を使用しない select ステートメントの結果は２次キャッシュに保存されます。Cursor を使うクエリはこのキャッシュを使用しません。</li>
           <li>この SQL マップファイルに含まれる insert, update, delete ステートメントを実行するとキャッシュがフラッシュされます。</li>
           <li>このキャッシュは LRU アルゴリズムに基づいて置き換えられます。</li>
           <li>このキャッシュは経過時間によってフラッシュされることはありません（つまり Flush Interval は設定されていないということです）。</li>
           <li>このキャッシュはクエリ結果のリストまたはオブジェクトへの参照を 1024 個格納します。</li>
           <li>このキャッシュは読み書き可能なキャッシュとして扱われます。これはつまり、取得したオブジェクトは共有されず、呼び出した側で安全に変更することができる（別の呼び出し元や他スレッドでの変更の影響を受けない）ということを意味しています。</li>
         </ul>
+
+        <p>
+          <span class="label important">重要</span> 対応する Java マッパーのステートメントをキャッシュの適用対象に含めるためには <code>@CacheNamespaceRef</code> アノテーションで XML マッパーのネームスペースを指定する必要があります。
+        </p>
 
         <p>
           これらのプロパティは cache 要素の属性で変更することができます。
@@ -1929,7 +2174,7 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
 
         <p>
           上記は、カスタムキャッシュの実装を使用するための設定例です。
-          type 属性で指定されているクラスは org.mybatis.cache.Cache インターフェイスを実装している必要があります。
+          type 属性で指定されているクラスは org.apache.ibatis.cache.Cache インターフェイスを実装している必要があります。
           このインターフェイスは MyBatis の中では複雑な方ですが、その役割を考えればシンプルです。
         </p>
 
@@ -1938,7 +2183,6 @@ SELECT * FROM POST WHERE BLOG_ID = #{id}]]></source>
   int getSize();
   void putObject(Object key, Object value);
   Object getObject(Object key);
-  boolean hasKey(Object key);
   Object removeObject(Object key);
   void clear();
 }]]></source>

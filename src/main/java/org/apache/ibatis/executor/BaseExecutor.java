@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2016 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,6 +36,7 @@ import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.mapping.ParameterMode;
 import org.apache.ibatis.mapping.StatementType;
 import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.ParamNameResolver;
 import org.apache.ibatis.reflection.factory.ObjectFactory;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.LocalCacheScope;
@@ -64,7 +65,7 @@ public abstract class BaseExecutor implements Executor {
 
   protected BaseExecutor(Configuration configuration, Transaction transaction) {
     this.transaction = transaction;
-    this.deferredLoads = new ConcurrentLinkedQueue<DeferredLoad>();
+    this.deferredLoads = new ConcurrentLinkedQueue<>();
     this.localCache = new PerpetualCache("LocalCache");
     this.localOutputParameterCache = new PerpetualCache("LocalOutputParameterCache");
     this.closed = false;
@@ -91,7 +92,7 @@ public abstract class BaseExecutor implements Executor {
         }
       }
     } catch (SQLException e) {
-      // Ignore.  There's nothing that can be done at this point.
+      // Ignore. There's nothing that can be done at this point.
       log.warn("Unexpected exception on closing transaction.  Cause: " + e);
     } finally {
       transaction = null;
@@ -130,15 +131,17 @@ public abstract class BaseExecutor implements Executor {
   }
 
   @Override
-  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
+  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler)
+      throws SQLException {
     BoundSql boundSql = ms.getBoundSql(parameter);
     CacheKey key = createCacheKey(ms, parameter, rowBounds, boundSql);
     return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
- }
+  }
 
   @SuppressWarnings("unchecked")
   @Override
-  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
+  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,
+      CacheKey key, BoundSql boundSql) throws SQLException {
     ErrorContext.instance().resource(ms.getResource()).activity("executing a query").object(ms.getId());
     if (closed) {
       throw new ExecutorException("Executor was closed.");
@@ -179,7 +182,8 @@ public abstract class BaseExecutor implements Executor {
   }
 
   @Override
-  public void deferLoad(MappedStatement ms, MetaObject resultObject, String property, CacheKey key, Class<?> targetType) {
+  public void deferLoad(MappedStatement ms, MetaObject resultObject, String property, CacheKey key,
+      Class<?> targetType) {
     if (closed) {
       throw new ExecutorException("Executor was closed.");
     }
@@ -204,19 +208,29 @@ public abstract class BaseExecutor implements Executor {
     List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
     TypeHandlerRegistry typeHandlerRegistry = ms.getConfiguration().getTypeHandlerRegistry();
     // mimic DefaultParameterHandler logic
+    MetaObject metaObject = null;
     for (ParameterMapping parameterMapping : parameterMappings) {
       if (parameterMapping.getMode() != ParameterMode.OUT) {
         Object value;
         String propertyName = parameterMapping.getProperty();
-        if (boundSql.hasAdditionalParameter(propertyName)) {
+        if (parameterMapping.hasValue()) {
+          value = parameterMapping.getValue();
+        } else if (boundSql.hasAdditionalParameter(propertyName)) {
           value = boundSql.getAdditionalParameter(propertyName);
         } else if (parameterObject == null) {
           value = null;
-        } else if (typeHandlerRegistry.hasTypeHandler(parameterObject.getClass())) {
-          value = parameterObject;
         } else {
-          MetaObject metaObject = configuration.newMetaObject(parameterObject);
-          value = metaObject.getValue(propertyName);
+          ParamNameResolver paramNameResolver = ms.getParamNameResolver();
+          if (paramNameResolver != null
+              && typeHandlerRegistry.hasTypeHandler(paramNameResolver.getType(paramNameResolver.getNames()[0]))
+              || typeHandlerRegistry.hasTypeHandler(parameterObject.getClass())) {
+            value = parameterObject;
+          } else {
+            if (metaObject == null) {
+              metaObject = configuration.newMetaObject(parameterObject);
+            }
+            value = metaObject.getValue(propertyName);
+          }
         }
         cacheKey.update(value);
       }
@@ -267,17 +281,15 @@ public abstract class BaseExecutor implements Executor {
     }
   }
 
-  protected abstract int doUpdate(MappedStatement ms, Object parameter)
-      throws SQLException;
+  protected abstract int doUpdate(MappedStatement ms, Object parameter) throws SQLException;
 
-  protected abstract List<BatchResult> doFlushStatements(boolean isRollback)
-      throws SQLException;
+  protected abstract List<BatchResult> doFlushStatements(boolean isRollback) throws SQLException;
 
-  protected abstract <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql)
-      throws SQLException;
+  protected abstract <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds,
+      ResultHandler resultHandler, BoundSql boundSql) throws SQLException;
 
-  protected abstract <E> Cursor<E> doQueryCursor(MappedStatement ms, Object parameter, RowBounds rowBounds, BoundSql boundSql)
-      throws SQLException;
+  protected abstract <E> Cursor<E> doQueryCursor(MappedStatement ms, Object parameter, RowBounds rowBounds,
+      BoundSql boundSql) throws SQLException;
 
   protected void closeStatement(Statement statement) {
     if (statement != null) {
@@ -291,16 +303,23 @@ public abstract class BaseExecutor implements Executor {
 
   /**
    * Apply a transaction timeout.
-   * @param statement a current statement
-   * @throws SQLException if a database access error occurs, this method is called on a closed <code>Statement</code>
+   *
+   * @param statement
+   *          a current statement
+   *
+   * @throws SQLException
+   *           if a database access error occurs, this method is called on a closed <code>Statement</code>
+   *
    * @since 3.4.0
+   *
    * @see StatementUtil#applyTransactionTimeout(Statement, Integer, Integer)
    */
   protected void applyTransactionTimeout(Statement statement) throws SQLException {
     StatementUtil.applyTransactionTimeout(statement, statement.getQueryTimeout(), transaction.getTimeout());
   }
 
-  private void handleLocallyCachedOutputParameters(MappedStatement ms, CacheKey key, Object parameter, BoundSql boundSql) {
+  private void handleLocallyCachedOutputParameters(MappedStatement ms, CacheKey key, Object parameter,
+      BoundSql boundSql) {
     if (ms.getStatementType() == StatementType.CALLABLE) {
       final Object cachedParameter = localOutputParameterCache.getObject(key);
       if (cachedParameter != null && parameter != null) {
@@ -317,7 +336,8 @@ public abstract class BaseExecutor implements Executor {
     }
   }
 
-  private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
+  private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds,
+      ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     List<E> list;
     localCache.putObject(key, EXECUTION_PLACEHOLDER);
     try {
@@ -336,16 +356,15 @@ public abstract class BaseExecutor implements Executor {
     Connection connection = transaction.getConnection();
     if (statementLog.isDebugEnabled()) {
       return ConnectionLogger.newInstance(connection, statementLog, queryStack);
-    } else {
-      return connection;
     }
+    return connection;
   }
 
   @Override
   public void setExecutorWrapper(Executor wrapper) {
     this.wrapper = wrapper;
   }
-  
+
   private static class DeferredLoad {
 
     private final MetaObject resultObject;
@@ -357,12 +376,8 @@ public abstract class BaseExecutor implements Executor {
     private final ResultExtractor resultExtractor;
 
     // issue #781
-    public DeferredLoad(MetaObject resultObject,
-                        String property,
-                        CacheKey key,
-                        PerpetualCache localCache,
-                        Configuration configuration,
-                        Class<?> targetType) {
+    public DeferredLoad(MetaObject resultObject, String property, CacheKey key, PerpetualCache localCache,
+        Configuration configuration, Class<?> targetType) {
       this.resultObject = resultObject;
       this.property = property;
       this.key = key;
@@ -373,11 +388,12 @@ public abstract class BaseExecutor implements Executor {
     }
 
     public boolean canLoad() {
-      return localCache.getObject(key) != null && localCache.getObject(key) != EXECUTION_PLACEHOLDER;
+      Object cached = localCache.getObject(key);
+      return cached != null && cached != EXECUTION_PLACEHOLDER;
     }
 
     public void load() {
-      @SuppressWarnings( "unchecked" )
+      @SuppressWarnings("unchecked")
       // we suppose we get back a List
       List<Object> list = (List<Object>) localCache.getObject(key);
       Object value = resultExtractor.extractObjectFromList(list, targetType);

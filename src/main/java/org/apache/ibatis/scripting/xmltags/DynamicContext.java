@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2015 the original author or authors.
+/*
+ *    Copyright 2009-2025 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,21 @@
  */
 package org.apache.ibatis.scripting.xmltags;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import ognl.OgnlContext;
-import ognl.OgnlException;
 import ognl.OgnlRuntime;
 import ognl.PropertyAccessor;
 
+import org.apache.ibatis.builder.ParameterMappingTokenHandler;
+import org.apache.ibatis.mapping.ParameterMapping;
+import org.apache.ibatis.parsing.GenericTokenParser;
 import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.ParamNameResolver;
 import org.apache.ibatis.session.Configuration;
 
 /**
@@ -38,19 +44,38 @@ public class DynamicContext {
     OgnlRuntime.setPropertyAccessor(ContextMap.class, new ContextAccessor());
   }
 
-  private final ContextMap bindings;
-  private final StringBuilder sqlBuilder = new StringBuilder();
-  private int uniqueNumber = 0;
+  protected final ContextMap bindings;
+  private final StringJoiner sqlBuilder = new StringJoiner(" ");
 
-  public DynamicContext(Configuration configuration, Object parameterObject) {
-    if (parameterObject != null && !(parameterObject instanceof Map)) {
-      MetaObject metaObject = configuration.newMetaObject(parameterObject);
-      bindings = new ContextMap(metaObject);
+  private final Configuration configuration;
+  private final Object parameterObject;
+  private final Class<?> parameterType;
+  private final ParamNameResolver paramNameResolver;
+  private final boolean paramExists;
+
+  private GenericTokenParser tokenParser;
+  private ParameterMappingTokenHandler tokenHandler;
+
+  public DynamicContext(Configuration configuration, Class<?> parameterType, ParamNameResolver paramNameResolver) {
+    this(configuration, null, parameterType, paramNameResolver, false);
+  }
+
+  public DynamicContext(Configuration configuration, Object parameterObject, Class<?> parameterType,
+      ParamNameResolver paramNameResolver, boolean paramExists) {
+    if (parameterObject == null || parameterObject instanceof Map) {
+      bindings = new ContextMap(null, false);
     } else {
-      bindings = new ContextMap(null);
+      MetaObject metaObject = configuration.newMetaObject(parameterObject);
+      boolean existsTypeHandler = configuration.getTypeHandlerRegistry().hasTypeHandler(parameterObject.getClass());
+      bindings = new ContextMap(metaObject, existsTypeHandler);
     }
     bindings.put(PARAMETER_OBJECT_KEY, parameterObject);
     bindings.put(DATABASE_ID_KEY, configuration.getDatabaseId());
+    this.configuration = configuration;
+    this.parameterObject = parameterObject;
+    this.paramExists = paramExists;
+    this.parameterType = parameterType;
+    this.paramNameResolver = paramNameResolver;
   }
 
   public Map<String, Object> getBindings() {
@@ -62,24 +87,55 @@ public class DynamicContext {
   }
 
   public void appendSql(String sql) {
-    sqlBuilder.append(sql);
-    sqlBuilder.append(" ");
+    sqlBuilder.add(sql);
   }
 
   public String getSql() {
     return sqlBuilder.toString().trim();
   }
 
-  public int getUniqueNumber() {
-    return uniqueNumber++;
+  private void initTokenParser(List<ParameterMapping> parameterMappings) {
+    if (tokenParser == null) {
+      tokenHandler = new ParameterMappingTokenHandler(parameterMappings != null ? parameterMappings : new ArrayList<>(),
+          configuration, parameterObject, parameterType, bindings, paramNameResolver, paramExists);
+      tokenParser = new GenericTokenParser("#{", "}", tokenHandler);
+    }
+  }
+
+  public List<ParameterMapping> getParameterMappings() {
+    initTokenParser(null);
+    return tokenHandler.getParameterMappings();
+  }
+
+  protected String parseParam(String sql) {
+    initTokenParser(getParameterMappings());
+    return tokenParser.parse(sql);
+  }
+
+  protected Object getParameterObject() {
+    return parameterObject;
+  }
+
+  protected Class<?> getParameterType() {
+    return parameterType;
+  }
+
+  protected ParamNameResolver getParamNameResolver() {
+    return paramNameResolver;
+  }
+
+  protected boolean isParamExists() {
+    return paramExists;
   }
 
   static class ContextMap extends HashMap<String, Object> {
     private static final long serialVersionUID = 2977601501966151582L;
+    private final MetaObject parameterMetaObject;
+    private final boolean fallbackParameterObject;
 
-    private MetaObject parameterMetaObject;
-    public ContextMap(MetaObject parameterMetaObject) {
+    public ContextMap(MetaObject parameterMetaObject, boolean fallbackParameterObject) {
       this.parameterMetaObject = parameterMetaObject;
+      this.fallbackParameterObject = fallbackParameterObject;
     }
 
     @Override
@@ -89,20 +145,22 @@ public class DynamicContext {
         return super.get(strKey);
       }
 
-      if (parameterMetaObject != null) {
-        // issue #61 do not modify the context when reading
-        return parameterMetaObject.getValue(strKey);
+      if (parameterMetaObject == null) {
+        return null;
       }
 
-      return null;
+      if (fallbackParameterObject && !parameterMetaObject.hasGetter(strKey)) {
+        return parameterMetaObject.getOriginalObject();
+      }
+      // issue #61 do not modify the context when reading
+      return parameterMetaObject.getValue(strKey);
     }
   }
 
   static class ContextAccessor implements PropertyAccessor {
 
     @Override
-    public Object getProperty(Map context, Object target, Object name)
-        throws OgnlException {
+    public Object getProperty(OgnlContext context, Object target, Object name) {
       Map map = (Map) target;
 
       Object result = map.get(name);
@@ -112,15 +170,14 @@ public class DynamicContext {
 
       Object parameterObject = map.get(PARAMETER_OBJECT_KEY);
       if (parameterObject instanceof Map) {
-        return ((Map)parameterObject).get(name);
+        return ((Map) parameterObject).get(name);
       }
 
       return null;
     }
 
     @Override
-    public void setProperty(Map context, Object target, Object name, Object value)
-        throws OgnlException {
+    public void setProperty(OgnlContext context, Object target, Object name, Object value) {
       Map<Object, Object> map = (Map<Object, Object>) target;
       map.put(name, value);
     }

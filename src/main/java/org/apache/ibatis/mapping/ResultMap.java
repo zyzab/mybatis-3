@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2015 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +16,20 @@
 package org.apache.ibatis.mapping;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.type.JdbcType;
 
 /**
  * @author Clinton Begin
  */
 public class ResultMap {
+  private Configuration configuration;
+
   private String id;
   private Class<?> type;
   private List<ResultMapping> resultMappings;
@@ -35,7 +37,9 @@ public class ResultMap {
   private List<ResultMapping> constructorResultMappings;
   private List<ResultMapping> propertyResultMappings;
   private Set<String> mappedColumns;
+  private Set<String> mappedProperties;
   private Discriminator discriminator;
+  private boolean hasResultMapsUsingConstructorCollection;
   private boolean hasNestedResultMaps;
   private boolean hasNestedQueries;
   private Boolean autoMapping;
@@ -43,14 +47,30 @@ public class ResultMap {
   private ResultMap() {
   }
 
+  public static ResultMap buildEmpty(Configuration configuration, String statementId, Class<?> resultType) {
+    ResultMap emptyResultMap = new ResultMap();
+    emptyResultMap.configuration = configuration;
+    emptyResultMap.id = statementId;
+    emptyResultMap.type = resultType;
+    emptyResultMap.resultMappings = List.of();
+    emptyResultMap.idResultMappings = List.of();
+    emptyResultMap.constructorResultMappings = List.of();
+    emptyResultMap.propertyResultMappings = List.of();
+    emptyResultMap.mappedColumns = Set.of();
+    emptyResultMap.mappedProperties = Set.of();
+    return emptyResultMap;
+  }
+
   public static class Builder {
-    private ResultMap resultMap = new ResultMap();
+    private final ResultMap resultMap = new ResultMap();
 
     public Builder(Configuration configuration, String id, Class<?> type, List<ResultMapping> resultMappings) {
       this(configuration, id, type, resultMappings, null);
     }
 
-    public Builder(Configuration configuration, String id, Class<?> type, List<ResultMapping> resultMappings, Boolean autoMapping) {
+    public Builder(Configuration configuration, String id, Class<?> type, List<ResultMapping> resultMappings,
+        Boolean autoMapping) {
+      resultMap.configuration = configuration;
       resultMap.id = id;
       resultMap.type = type;
       resultMap.resultMappings = resultMappings;
@@ -70,13 +90,17 @@ public class ResultMap {
       if (resultMap.id == null) {
         throw new IllegalArgumentException("ResultMaps must have an id");
       }
-      resultMap.mappedColumns = new HashSet<String>();
-      resultMap.idResultMappings = new ArrayList<ResultMapping>();
-      resultMap.constructorResultMappings = new ArrayList<ResultMapping>();
-      resultMap.propertyResultMappings = new ArrayList<ResultMapping>();
+
+      resultMap.mappedColumns = new HashSet<>();
+      resultMap.mappedProperties = new HashSet<>();
+      resultMap.idResultMappings = new ArrayList<>();
+      resultMap.constructorResultMappings = new ArrayList<>();
+      resultMap.propertyResultMappings = new ArrayList<>();
+
       for (ResultMapping resultMapping : resultMap.resultMappings) {
         resultMap.hasNestedQueries = resultMap.hasNestedQueries || resultMapping.getNestedQueryId() != null;
-        resultMap.hasNestedResultMaps = resultMap.hasNestedResultMaps || (resultMapping.getNestedResultMapId() != null && resultMapping.getResultSet() == null);
+        resultMap.hasNestedResultMaps = resultMap.hasNestedResultMaps || resultMapping.getNestedResultMapId() != null
+            && resultMapping.getResultSet() == null && !JdbcType.CURSOR.equals(resultMapping.getJdbcType());
         final String column = resultMapping.getColumn();
         if (column != null) {
           resultMap.mappedColumns.add(column.toUpperCase(Locale.ENGLISH));
@@ -88,30 +112,51 @@ public class ResultMap {
             }
           }
         }
+
+        final String property = resultMapping.getProperty();
+        if (property != null) {
+          resultMap.mappedProperties.add(property);
+        }
+
         if (resultMapping.getFlags().contains(ResultFlag.CONSTRUCTOR)) {
           resultMap.constructorResultMappings.add(resultMapping);
+
+          // #101
+          Class<?> javaType = resultMapping.getJavaType();
+          resultMap.hasResultMapsUsingConstructorCollection = resultMap.hasResultMapsUsingConstructorCollection
+              || (resultMapping.getNestedQueryId() == null && resultMapping.getTypeHandler() == null && javaType != null
+                  && resultMap.configuration.getObjectFactory().isCollection(javaType));
         } else {
           resultMap.propertyResultMappings.add(resultMapping);
         }
+
         if (resultMapping.getFlags().contains(ResultFlag.ID)) {
           resultMap.idResultMappings.add(resultMapping);
         }
       }
+
       if (resultMap.idResultMappings.isEmpty()) {
         resultMap.idResultMappings.addAll(resultMap.resultMappings);
       }
+
       // lock down collections
-      resultMap.resultMappings = Collections.unmodifiableList(resultMap.resultMappings);
-      resultMap.idResultMappings = Collections.unmodifiableList(resultMap.idResultMappings);
-      resultMap.constructorResultMappings = Collections.unmodifiableList(resultMap.constructorResultMappings);
-      resultMap.propertyResultMappings = Collections.unmodifiableList(resultMap.propertyResultMappings);
-      resultMap.mappedColumns = Collections.unmodifiableSet(resultMap.mappedColumns);
+      resultMap.resultMappings = List.copyOf(resultMap.resultMappings);
+      resultMap.idResultMappings = List.copyOf(resultMap.idResultMappings);
+      resultMap.constructorResultMappings = List.copyOf(resultMap.constructorResultMappings);
+      resultMap.propertyResultMappings = List.copyOf(resultMap.propertyResultMappings);
+      resultMap.mappedColumns = Set.copyOf(resultMap.mappedColumns);
+      resultMap.mappedProperties = Set.copyOf(resultMap.mappedProperties);
+
       return resultMap;
     }
   }
 
   public String getId() {
     return id;
+  }
+
+  public boolean hasResultMapsUsingConstructorCollection() {
+    return hasResultMapsUsingConstructorCollection;
   }
 
   public boolean hasNestedResultMaps() {
@@ -146,6 +191,10 @@ public class ResultMap {
     return mappedColumns;
   }
 
+  public Set<String> getMappedProperties() {
+    return mappedProperties;
+  }
+
   public Discriminator getDiscriminator() {
     return discriminator;
   }
@@ -153,7 +202,7 @@ public class ResultMap {
   public void forceNestedResultMaps() {
     hasNestedResultMaps = true;
   }
-  
+
   public Boolean getAutoMapping() {
     return autoMapping;
   }

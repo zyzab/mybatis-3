@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2016 the original author or authors.
+/*
+ *    Copyright 2009-2023 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,52 +15,48 @@
  */
 package org.apache.ibatis.submitted.global_variables_defaults;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.util.Properties;
+
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.parsing.PropertyParser;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.hamcrest.core.Is;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.util.Properties;
-
-public class XmlMapperTest {
+class XmlMapperTest {
 
   @Test
-  public void applyDefaultValueOnXmlMapper() throws IOException {
+  void applyDefaultValueOnXmlMapper() throws IOException {
 
     Properties props = new Properties();
     props.setProperty(PropertyParser.KEY_ENABLE_DEFAULT_VALUE, "true");
 
-    Reader reader = Resources.getResourceAsReader("org/apache/ibatis/submitted/global_variables_defaults/mybatis-config.xml");
+    Reader reader = Resources
+        .getResourceAsReader("org/apache/ibatis/submitted/global_variables_defaults/mybatis-config.xml");
     SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, props);
     Configuration configuration = factory.getConfiguration();
     configuration.addMapper(XmlMapper.class);
     SupportClasses.CustomCache cache = SupportClasses.Utils.unwrap(configuration.getCache(XmlMapper.class.getName()));
 
-    Assert.assertThat(cache.getName(), Is.is("default"));
+    Assertions.assertThat(cache.getName()).isEqualTo("default");
 
-    SqlSession sqlSession = factory.openSession();
-    try {
+    try (SqlSession sqlSession = factory.openSession()) {
       XmlMapper mapper = sqlSession.getMapper(XmlMapper.class);
 
-      Assert.assertThat(mapper.ping(), Is.is("Hello"));
-      Assert.assertThat(mapper.selectOne(), Is.is("1"));
-      Assert.assertThat(mapper.selectFromVariable(), Is.is("9999"));
-
-    } finally {
-      sqlSession.close();
+      Assertions.assertThat(mapper.ping()).isEqualTo("Hello");
+      Assertions.assertThat(mapper.selectOne()).isEqualTo("1");
+      Assertions.assertThat(mapper.selectFromVariable()).isEqualTo("9999");
     }
 
   }
 
   @Test
-  public void applyPropertyValueOnXmlMapper() throws IOException {
+  void applyPropertyValueOnXmlMapper() throws IOException {
 
     Properties props = new Properties();
     props.setProperty(PropertyParser.KEY_ENABLE_DEFAULT_VALUE, "true");
@@ -68,24 +64,21 @@ public class XmlMapperTest {
     props.setProperty("cache.name", "custom");
     props.setProperty("select.columns", "'5555'");
 
-    Reader reader = Resources.getResourceAsReader("org/apache/ibatis/submitted/global_variables_defaults/mybatis-config.xml");
+    Reader reader = Resources
+        .getResourceAsReader("org/apache/ibatis/submitted/global_variables_defaults/mybatis-config.xml");
     SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, props);
     Configuration configuration = factory.getConfiguration();
     configuration.addMapper(XmlMapper.class);
     SupportClasses.CustomCache cache = SupportClasses.Utils.unwrap(configuration.getCache(XmlMapper.class.getName()));
 
-    Assert.assertThat(cache.getName(), Is.is("custom"));
+    Assertions.assertThat(cache.getName()).isEqualTo("custom");
 
-    SqlSession sqlSession = factory.openSession();
-    try {
+    try (SqlSession sqlSession = factory.openSession()) {
       XmlMapper mapper = sqlSession.getMapper(XmlMapper.class);
 
-      Assert.assertThat(mapper.ping(), Is.is("Hi"));
-      Assert.assertThat(mapper.selectOne(), Is.is("1"));
-      Assert.assertThat(mapper.selectFromVariable(), Is.is("5555"));
-
-    } finally {
-      sqlSession.close();
+      Assertions.assertThat(mapper.ping()).isEqualTo("Hi");
+      Assertions.assertThat(mapper.selectOne()).isEqualTo("1");
+      Assertions.assertThat(mapper.selectFromVariable()).isEqualTo("5555");
     }
 
   }

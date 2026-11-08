@@ -1,11 +1,11 @@
-/**
- *    Copyright 2009-2015 the original author or authors.
+/*
+ *    Copyright 2009-2026 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
  *    You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *       https://www.apache.org/licenses/LICENSE-2.0
  *
  *    Unless required by applicable law or agreed to in writing, software
  *    distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InvalidClassException;
 import java.io.ObjectInput;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
@@ -31,37 +32,47 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.ibatis.io.SerialFilterChecker;
 import org.apache.ibatis.reflection.factory.ObjectFactory;
 
 /**
+ * Serialized form of a lazy-loading proxy that still has unloaded properties.
+ * <p>
+ * The proxy state is written as a nested byte array and read back with a separate {@link ObjectInputStream} in
+ * {@link #readResolve()}. If the outer stream has an {@link ObjectInputFilter} set via
+ * {@link ObjectInputStream#setObjectInputFilter(ObjectInputFilter)}, that filter is applied to the nested stream as
+ * well. An allowlist filter therefore has to accept not only this holder class and {@code byte[]}, but also the classes
+ * read from the nested stream: the target bean and the classes it references, {@code java.util.HashMap},
+ * {@code java.util.Map$Entry[]}, {@link ResultLoaderMap.LoadPair}, the {@link ObjectFactory} implementation,
+ * {@code java.lang.Class[]}, {@code java.lang.Object[]} and the types of any constructor arguments and mapped
+ * parameters.
+ *
  * @author Eduardo Macarron
  * @author Franta Mejta
  */
 public abstract class AbstractSerialStateHolder implements Externalizable {
 
   private static final long serialVersionUID = 8940388717901644661L;
-  private static final ThreadLocal<ObjectOutputStream> stream = new ThreadLocal<ObjectOutputStream>();
-  private byte[] userBeanBytes = new byte[0];
+  private static final ThreadLocal<ObjectOutputStream> stream = new ThreadLocal<>();
+  private byte[] userBeanBytes = {};
   private Object userBean;
   private Map<String, ResultLoaderMap.LoadPair> unloadedProperties;
   private ObjectFactory objectFactory;
   private Class<?>[] constructorArgTypes;
   private Object[] constructorArgs;
+  private transient ObjectInputFilter objectInputFilter;
 
   public AbstractSerialStateHolder() {
   }
 
-  public AbstractSerialStateHolder(
-          final Object userBean,
-          final Map<String, ResultLoaderMap.LoadPair> unloadedProperties,
-          final ObjectFactory objectFactory,
-          List<Class<?>> constructorArgTypes,
-          List<Object> constructorArgs) {
+  public AbstractSerialStateHolder(final Object userBean,
+      final Map<String, ResultLoaderMap.LoadPair> unloadedProperties, final ObjectFactory objectFactory,
+      List<Class<?>> constructorArgTypes, List<Object> constructorArgs) {
     this.userBean = userBean;
-    this.unloadedProperties = new HashMap<String, ResultLoaderMap.LoadPair>(unloadedProperties);
+    this.unloadedProperties = new HashMap<>(unloadedProperties);
     this.objectFactory = objectFactory;
-    this.constructorArgTypes = constructorArgTypes.toArray(new Class<?>[constructorArgTypes.size()]);
-    this.constructorArgs = constructorArgs.toArray(new Object[constructorArgs.size()]);
+    this.constructorArgTypes = constructorArgTypes.toArray(new Class<?>[0]);
+    this.constructorArgs = constructorArgs.toArray(new Object[0]);
   }
 
   @Override
@@ -97,6 +108,9 @@ public abstract class AbstractSerialStateHolder implements Externalizable {
     } else {
       this.userBean = data;
     }
+    if (in instanceof ObjectInputStream) {
+      this.objectInputFilter = ((ObjectInputStream) in).getObjectInputFilter();
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -106,9 +120,13 @@ public abstract class AbstractSerialStateHolder implements Externalizable {
       return this.userBean;
     }
 
+    SerialFilterChecker.check();
+
     /* First run */
-    try {
-      final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(this.userBeanBytes));
+    try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(this.userBeanBytes))) {
+      if (this.objectInputFilter != null && this.objectInputFilter != in.getObjectInputFilter()) {
+        in.setObjectInputFilter(this.objectInputFilter);
+      }
       this.userBean = in.readObject();
       this.unloadedProperties = (Map<String, ResultLoaderMap.LoadPair>) in.readObject();
       this.objectFactory = (ObjectFactory) in.readObject();
@@ -120,13 +138,14 @@ public abstract class AbstractSerialStateHolder implements Externalizable {
       throw (ObjectStreamException) new InvalidClassException(ex.getLocalizedMessage()).initCause(ex);
     }
 
-    final Map<String, ResultLoaderMap.LoadPair> arrayProps = new HashMap<String, ResultLoaderMap.LoadPair>(this.unloadedProperties);
+    final Map<String, ResultLoaderMap.LoadPair> arrayProps = new HashMap<>(this.unloadedProperties);
     final List<Class<?>> arrayTypes = Arrays.asList(this.constructorArgTypes);
     final List<Object> arrayValues = Arrays.asList(this.constructorArgs);
 
     return this.createDeserializationProxy(userBean, arrayProps, objectFactory, arrayTypes, arrayValues);
   }
 
-  protected abstract Object createDeserializationProxy(Object target, Map<String, ResultLoaderMap.LoadPair> unloadedProperties, ObjectFactory objectFactory,
-          List<Class<?>> constructorArgTypes, List<Object> constructorArgs);
+  protected abstract Object createDeserializationProxy(Object target,
+      Map<String, ResultLoaderMap.LoadPair> unloadedProperties, ObjectFactory objectFactory,
+      List<Class<?>> constructorArgTypes, List<Object> constructorArgs);
 }

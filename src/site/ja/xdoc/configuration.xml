@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-       Copyright 2009-2016 the original author or authors.
+       Copyright 2009-2026 the original author or authors.
 
        Licensed under the Apache License, Version 2.0 (the "License");
        you may not use this file except in compliance with the License.
        You may obtain a copy of the License at
 
-          http://www.apache.org/licenses/LICENSE-2.0
+          https://www.apache.org/licenses/LICENSE-2.0
 
        Unless required by applicable law or agreed to in writing, software
        distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 
 -->
 <document xmlns="http://maven.apache.org/XDOC/2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/XDOC/2.0 http://maven.apache.org/xsd/xdoc-2.0.xsd">
+  xsi:schemaLocation="http://maven.apache.org/XDOC/2.0 https://maven.apache.org/xsd/xdoc-2.0.xsd">
 
   <properties>
     <title>MyBatis 3 | 設定</title>
@@ -200,10 +200,10 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
             </tr>
             <tr>
               <td>
-                multipleResultSetsEnabled
+                <strike>multipleResultSetsEnabled</strike>
               </td>
               <td>
-                １つのステートメントから複数の ResultSet を返すことを許可するかどうかを指定します（複数 ResultSet に対応したドライバが必要です）。
+                非推奨。この設定は何の効果もありません。
               </td>
               <td>
                 true | false
@@ -240,7 +240,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 true | false
               </td>
               <td>
-                False
+                false
               </td>
             </tr>
             <tr>
@@ -271,6 +271,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                   <li><code>WARNING</code>: 警告ログを出力します (<code>'org.apache.ibatis.session.AutoMappingUnknownColumnBehavior'</code> のログレベルを<code>WARN</code>に設定してください)</li>
                   <li><code>FAILING</code>: 自動マッピング処理をエラーにします。(<code>SqlSessionException</code>が発生します)</li>
                 </ul>
+                この機能には制限があり、`autoMappingBehavior` に `FULL` がセットされていると誤った結果が報告される場合があります。
               </td>
               <td>
                 NONE, WARNING, FAILING
@@ -306,7 +307,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 ドライバがデータベースからの応答を待ち続ける秒数（タイムアウト）を設定します。
               </td>
               <td>
-                正の整数（単位：秒）
+                0 以上の整数（単位：秒）
               </td>
               <td>
                 なし (null)
@@ -321,7 +322,21 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 このパラメータ値はクエリ毎の設定で上書きできます。
               </td>
               <td>
-                正の整数
+                0 以上の整数
+              </td>
+              <td>
+                なし (null)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                defaultResultSetType
+              </td>
+              <td>
+                ステートメント毎の設定を省略した場合のスクロール方法を指定します。 (導入されたバージョン: 3.5.2)
+              </td>
+              <td>
+                FORWARD_ONLY | SCROLL_SENSITIVE | SCROLL_INSENSITIVE | DEFAULT(指定しない時と同じ動作)
               </td>
               <td>
                 なし (null)
@@ -332,14 +347,14 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 safeRowBoundsEnabled
               </td>
               <td>
-                ネストされたステートメントに対して RowBounds の使用を許可するかどうかを設定します。
-                許可する場合は、 false を設定します。
+                true の場合、ネストされた結果マッピングで RowBounds のオフセットが 0 より大きいか、上限がデフォルト値より小さいと例外が発生します。
+                このチェックを省略する場合は false を設定します。
               </td>
               <td>
                 true | false
               </td>
               <td>
-                False
+                false
               </td>
             </tr>
             <tr>
@@ -347,14 +362,14 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 safeResultHandlerEnabled
               </td>
               <td>
-                ネストされたステートメントに対して ResultHandler の使用を許可するかどうかを設定します。
-                許可する場合は、 false を設定します。
+                ネストされた結果マッピングを含むステートメントでカスタム ResultHandler を使用する場合の安全性チェックを設定します。true の場合は使用できませんが、resultOrdered が true のステートメントは例外です。
+                チェックを無効にする場合は false を設定します。
               </td>
               <td>
                 true | false
               </td>
               <td>
-                True
+                true
               </td>
             </tr>
             <tr>
@@ -368,7 +383,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 true | false
               </td>
               <td>
-                False
+                false
               </td>
             </tr>
             <tr>
@@ -377,7 +392,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
               </td>
               <td>
                 MyBatis は循環参照の解決やネストされたクエリのスピード向上のためにローカルキャッシュを使用します。
-                デフォルト（SESSION）では同一セッション内の全てのクエリ結果がキャッシュされます。localCacheScope に STATEMENT を設定した場合、ローカルキャッシュはステートメントごとに適用されます。言い換えると、同一 SqlSession に対する複数の呼び出しでデータが共有されることはありません。
+                デフォルト（SESSION）では同一セッション内の通常のクエリ結果がキャッシュされます。カスタム ResultHandler を渡すクエリはローカルキャッシュを読み込まず、Cursor を使うクエリはローカルキャッシュを使用しません。localCacheScope に STATEMENT を設定した場合、ローカルキャッシュはステートメントごとに適用されます。言い換えると、同一 SqlSession に対する複数の呼び出しでデータが共有されることはありません。
               </td>
               <td>
                 SESSION | STATEMENT
@@ -431,6 +446,20 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
             </tr>
             <tr>
               <td>
+                defaultEnumTypeHandler
+              </td>
+              <td>
+                Enum型に適用するデフォルトの <code>TypeHandler</code> を指定します。(導入されたバージョン: 3.4.5)
+              </td>
+              <td>
+                タイプエイリアスまたは完全修飾クラス名
+              </td>
+              <td>
+                org.apache.ibatis.type.EnumTypeHandler
+              </td>
+            </tr>
+            <tr>
+              <td>
                 callSettersOnNulls
               </td>
               <td>
@@ -480,7 +509,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 MyBatis のログ出力に使用するロギング実装を指定します。未指定の場合は自動的検出されます。
               </td>
               <td>
-                SLF4J | LOG4J | LOG4J2 | JDK_LOGGING | COMMONS_LOGGING | STDOUT_LOGGING | NO_LOGGING
+                SLF4J | LOG4J(3.5.9以降非推奨) | LOG4J2 | JDK_LOGGING | COMMONS_LOGGING | STDOUT_LOGGING | NO_LOGGING
               </td>
               <td>
                 未指定
@@ -494,7 +523,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 Lazy Loading（遅延読み込み）に対応したオブジェクトを生成する際に使用するプロクシツールを指定します。
               </td>
               <td>
-                CGLIB | JAVASSIST
+                CGLIB (3.5.10 以降非推奨) | JAVASSIST
               </td>
               <td>
                 JAVASSIST (MyBatis 3.3 以上)
@@ -529,6 +558,92 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
                 true
               </td>
             </tr>
+            <tr>
+              <td>
+                configurationFactory
+              </td>
+              <td>
+                デシリアライズされたオブジェクトの遅延読込（Lazy loading）を行う際に利用される <code>Configuration</code> のインスタンスを返すクラスを指定します。
+                このクラスには次のシグネチャを持つメソッドが定義されている必要があります。 <code>static Configuration getConfiguration()</code>. (導入されたバージョン: 3.2.3)
+              </td>
+              <td>
+                タイプエイリアスまたは完全修飾クラス名
+              </td>
+              <td>
+                未指定
+              </td>
+            </tr>
+            <tr>
+              <td>
+                shrinkWhitespacesInSql
+              </td>
+              <td>
+                SQL 内の余分な空白文字を削除します。リテラル文字列も対象となる点に注意してください。（導入されたバージョン: 3.5.5）
+              </td>
+              <td>
+                true | false
+              </td>
+              <td>
+                false
+              </td>
+            </tr>
+            <tr>
+              <td>
+                defaultSqlProviderType
+              </td>
+              <td>
+                SQLを提供するメソッドを保持するSQLプロバイダクラスを指定します(導入されたバージョン: 3.5.6)。
+                ここで指定したクラスは、SQLプロバイダアノテーション(例: <code>@SelectProvider</code>)の<code>type</code>(または <code>value</code>) 属性を省略した際に適用されます。
+              </td>
+              <td>
+                タイプエイリアスまたは完全修飾クラス名
+              </td>
+              <td>
+                未指定
+              </td>
+            </tr>
+            <tr>
+              <td>
+                nullableOnForEach
+              </td>
+              <td>
+                'foreach' タグの 'nullable' 属性のデフォルト値. (導入されたバージョン: 3.5.9)
+              </td>
+              <td>
+                true | false
+              </td>
+              <td>
+                false
+              </td>
+            </tr>
+            <tr>
+              <td>
+                argNameBasedConstructorAutoMapping
+              </td>
+              <td>
+                引数を受け取るコンストラクタに対して自動マッピングを適用する際、引数名に一致する列をマップ対象にします。<code>false</code> の場合は列の順序依存となります。 (導入されたバージョン: 3.5.10）
+              </td>
+              <td>
+                true | false
+              </td>
+              <td>
+                false
+              </td>
+            </tr>
+            <tr>
+              <td>
+                ignoreParameterMetaData
+              </td>
+              <td>
+                タイプハンドラー解決時のパラメータメタデータ取得をスキップします。 (導入されたバージョン: 3.6.1）
+              </td>
+              <td>
+                true | false
+              </td>
+              <td>
+                false
+              </td>
+            </tr>
           </tbody>
         </table>
         <p>
@@ -537,7 +652,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
         <source><![CDATA[<settings>
   <setting name="cacheEnabled" value="true"/>
   <setting name="lazyLoadingEnabled" value="true"/>
-  <setting name="multipleResultSetsEnabled" value="true"/>
+  <setting name="aggressiveLazyLoading" value="true"/>
   <setting name="useColumnLabel" value="true"/>
   <setting name="useGeneratedKeys" value="false"/>
   <setting name="autoMappingBehavior" value="PARTIAL"/>
@@ -546,10 +661,21 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environ
   <setting name="defaultStatementTimeout" value="25"/>
   <setting name="defaultFetchSize" value="100"/>
   <setting name="safeRowBoundsEnabled" value="false"/>
+  <setting name="safeResultHandlerEnabled" value="true"/>
   <setting name="mapUnderscoreToCamelCase" value="false"/>
   <setting name="localCacheScope" value="SESSION"/>
   <setting name="jdbcTypeForNull" value="OTHER"/>
   <setting name="lazyLoadTriggerMethods" value="equals,clone,hashCode,toString"/>
+  <setting name="defaultScriptingLanguage" value="org.apache.ibatis.scripting.xmltags.XMLLanguageDriver"/>
+  <setting name="defaultEnumTypeHandler" value="org.apache.ibatis.type.EnumTypeHandler"/>
+  <setting name="callSettersOnNulls" value="false"/>
+  <setting name="returnInstanceForEmptyRow" value="false"/>
+  <setting name="logPrefix" value="exampleLogPreFix_"/>
+  <setting name="logImpl" value="JDK_LOGGING"/>
+  <setting name="proxyFactory" value="JAVASSIST"/>
+  <setting name="vfsImpl" value="org.mybatis.example.YourselfVfsImpl"/>
+  <setting name="useActualParamName" value="true"/>
+  <setting name="configurationFactory" value="org.mybatis.example.ConfigurationFactory"/>
 </settings>]]></source>
 
       </subsection>
@@ -628,6 +754,22 @@ public class Author {
             </tr>
             <tr>
               <td>
+                _char （3.5.10 以降）
+              </td>
+              <td>
+                char
+              </td>
+            </tr>
+            <tr>
+              <td>
+                _character （3.5.10 以降）
+              </td>
+              <td>
+                char
+              </td>
+            </tr>
+            <tr>
+              <td>
                 _long
               </td>
               <td>
@@ -696,6 +838,22 @@ public class Author {
               </td>
               <td>
                 Byte
+              </td>
+            </tr>
+            <tr>
+              <td>
+                char （3.5.10 以降）
+              </td>
+              <td>
+                Character
+              </td>
+            </tr>
+            <tr>
+              <td>
+                character （3.5.10 以降）
+              </td>
+              <td>
+                Character
               </td>
             </tr>
             <tr>
@@ -780,10 +938,58 @@ public class Author {
             </tr>
             <tr>
               <td>
+                biginteger
+              </td>
+              <td>
+                BigInteger
+              </td>
+            </tr>
+            <tr>
+              <td>
                 object
               </td>
               <td>
                 Object
+              </td>
+            </tr>
+            <tr>
+              <td>
+                date[]
+              </td>
+              <td>
+                Date[]
+              </td>
+            </tr>
+            <tr>
+              <td>
+                decimal[]
+              </td>
+              <td>
+                BigDecimal[]
+              </td>
+            </tr>
+            <tr>
+              <td>
+                bigdecimal[]
+              </td>
+              <td>
+                BigDecimal[]
+              </td>
+            </tr>
+            <tr>
+              <td>
+                biginteger[]
+              </td>
+              <td>
+                BigInteger[]
+              </td>
+            </tr>
+            <tr>
+              <td>
+                object[]
+              </td>
+              <td>
+                Object[]
               </td>
             </tr>
             <tr>
@@ -844,8 +1050,7 @@ public class Author {
         </p>
         <p>
           <span class="label important">NOTE</span>
-          JSR-310(Date and Time API)から提供されているクラスを使用する場合は、
-          <a href="https://github.com/mybatis/typehandlers-jsr310">mybatis-typehandlers-jsr310</a>を使用することができます。
+          バージョン3.4.5より、JSR-310(Date and Time API)のクラスがデフォルトでサポートされました。
         </p>
         <table>
           <thead>
@@ -881,7 +1086,7 @@ public class Author {
                 Byte, byte
               </td>
               <td>
-                NUMERIC または BYTE 互換の型
+                NUMERIC または TINYINT 互換の型
               </td>
             </tr>
             <tr>
@@ -892,7 +1097,7 @@ public class Author {
                 Short, short
               </td>
               <td>
-                NUMERIC または SHORT INTEGER 互換の型
+                NUMERIC または SMALLINT 互換の型
               </td>
             </tr>
             <tr>
@@ -914,7 +1119,7 @@ public class Author {
                 Long, long
               </td>
               <td>
-                NUMERIC または LONG INTEGER 互換の型
+                NUMERIC または BIGINT 互換の型
               </td>
             </tr>
             <tr>
@@ -958,7 +1163,7 @@ public class Author {
                 String
               </td>
               <td>
-                CHAR, VARCHAR
+                CHAR, VARCHAR, LONGVARCHAR
               </td>
             </tr>
             <tr>
@@ -980,7 +1185,7 @@ public class Author {
                 String
               </td>
               <td>
-                CLOB, LONGVARCHAR
+                CLOB
               </td>
             </tr>
             <tr>
@@ -991,7 +1196,7 @@ public class Author {
                 String
               </td>
               <td>
-                NVARCHAR, NCHAR
+                NVARCHAR, NCHAR, LONGNVARCHAR
               </td>
             </tr>
             <tr>
@@ -1128,13 +1333,145 @@ public class Author {
             </tr>
             <tr>
               <td>
-                <code>EnumOrdinalTypeHandler</code>
+                EnumOrdinalTypeHandler
               </td>
               <td>
                 Enumeration Type
               </td>
               <td>
                 コードではなく位置（ordinal）が保存されるので、NUMERIC または DOUBLE 互換の型
+              </td>
+            </tr>
+            <tr>
+              <td>
+                SqlxmlTypeHandler
+              </td>
+              <td>
+                java.lang.String
+              </td>
+              <td>
+                SQLXML
+              </td>
+            </tr>
+            <tr>
+              <td>
+                InstantTypeHandler
+              </td>
+              <td>
+                java.time.Instant
+              </td>
+              <td>
+                TIMESTAMP
+              </td>
+            </tr>
+            <tr>
+              <td>
+                LocalDateTimeTypeHandler
+              </td>
+              <td>
+                java.time.LocalDateTime
+              </td>
+              <td>
+                TIMESTAMP
+              </td>
+            </tr>
+            <tr>
+              <td>
+                LocalDateTypeHandler
+              </td>
+              <td>
+                java.time.LocalDate
+              </td>
+              <td>
+                DATE
+              </td>
+            </tr>
+            <tr>
+              <td>
+                LocalTimeTypeHandler
+              </td>
+              <td>
+                java.time.LocalTime
+              </td>
+              <td>
+                TIME
+              </td>
+            </tr>
+            <tr>
+              <td>
+                OffsetDateTimeTypeHandler
+              </td>
+              <td>
+                java.time.OffsetDateTime
+              </td>
+              <td>
+                TIMESTAMP
+              </td>
+            </tr>
+            <tr>
+              <td>
+                OffsetTimeTypeHandler
+              </td>
+              <td>
+                java.time.OffsetTime
+              </td>
+              <td>
+                TIME
+              </td>
+            </tr>
+            <tr>
+              <td>
+                ZonedDateTimeTypeHandler
+              </td>
+              <td>
+                java.time.ZonedDateTime
+              </td>
+              <td>
+                TIMESTAMP
+              </td>
+            </tr>
+            <tr>
+              <td>
+                YearTypeHandler
+              </td>
+              <td>
+                java.time.Year
+              </td>
+              <td>
+                INTEGER
+              </td>
+            </tr>
+            <tr>
+              <td>
+                MonthTypeHandler
+              </td>
+              <td>
+                java.time.Month
+              </td>
+              <td>
+                INTEGER
+              </td>
+            </tr>
+            <tr>
+              <td>
+                YearMonthTypeHandler
+              </td>
+              <td>
+                java.time.YearMonth
+              </td>
+              <td>
+                VARCHAR または LONGVARCHAR
+              </td>
+            </tr>
+            <tr>
+              <td>
+                JapaneseDateTypeHandler
+              </td>
+              <td>
+                java.time.chrono.JapaneseDate
+              </td>
+              <td>
+                DATE
               </td>
             </tr>
           </tbody>
@@ -1146,7 +1483,7 @@ public class Author {
 
         <source><![CDATA[// ExampleTypeHandler.java
 @MappedJdbcTypes(JdbcType.VARCHAR)
-public class StringTypeHandler extends BaseTypeHandler<String> {
+public class ExampleTypeHandler extends BaseTypeHandler<String> {
 
   @Override
   public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {
@@ -1178,11 +1515,11 @@ public class StringTypeHandler extends BaseTypeHandler<String> {
 
         <p>
           上記のようにして登録された TypeHandler は、String 型のプロパティと VARCHAR 型の引数または結果のマッピング時に使用されるデフォルトのタイプハンドラーよりも優先的に使用されます。
-          MyBatis はデータベースメタデータを参照してタイプを判断している訳ではないので、正しいタイプハンドラーが使用されるよう、パラメーター設定時にフィールドが VARCHAR 型であることを明示する必要があります。MyBatis は実際にステートメントが実行されるまで、データ型のチェックなどは行いません。
+          <code>ignoreParameterMetaData</code> が <code>false</code>（デフォルト）の場合、パラメーターの JDBC 型が明示されていなければ、MyBatis は JDBC のパラメーターメタデータを参照してタイプハンドラーを選択できます。ドライバーがメタデータを提供しない場合は、パラメーターマッピングに <code>jdbcType="VARCHAR"</code> を指定してください。結果マッピングで <code>typeHandler</code> と <code>jdbcType</code> のどちらも指定していない場合は、結果セットのメタデータを使ってタイプハンドラーを選択できます（後述）。
         </p>
 
         <p>
-          MyBatis は、このタイプハンドラーの総称型（Genric Type）から適用対象の Java タイプを自動判定しますが、この動作をオーバーライドする方法が２つあります。
+          MyBatis は、このタイプハンドラーの総称型（Generic Type）から適用対象の Java タイプを自動判定しますが、この動作をオーバーライドする方法が２つあります。
         </p>
         <ul>
           <li>typeHandler 要素に javaType 属性を追加する（例：javaType="String"）
@@ -1191,18 +1528,18 @@ public class StringTypeHandler extends BaseTypeHandler<String> {
           </li>
         </ul>
 
-        <p>typeHandler 要素に jdbcType 属性を追加することで適用対象の JDBC タイプを指定することもできます（例：jdbcType=VARCHAR）。jdbcType 属性が指定されている場合、<code>@MappedJdbcTypes</code> の指定は無視されます。
-        </p>
         <p>適用対象の JDBC タイプを指定する方法は二つあります。</p>
         <ul>
-          <li>typeHandler 要素に jdbcType 属性を追加する（例：jdbcType=VARCHAR）。</li>
-          <li>TypeHandler の実装クラスに <code>@MappedJdbcTypes</code> を付加し、JDBC タイプのリストを指定します。jdbcType 属性が指定されている場合、このアノテーションは無視されます。</li>
+          <li>同じ typeHandler 要素に <code>javaType</code> と <code>jdbcType</code> の両方を指定します（例：<code>javaType="String" jdbcType="VARCHAR"</code>）。<code>javaType</code> を省略すると XML の <code>jdbcType</code> 属性は無視され、<code>@MappedJdbcTypes</code> があればその指定が使用されます。</li>
+          <li>TypeHandler の実装クラスに <code>@MappedJdbcTypes</code> を付加し、JDBC タイプのリストを指定します。同じ要素に <code>javaType</code> と <code>jdbcType</code> の両方を指定した場合、このアノテーションは無視されます。</li>
         </ul>
 
         <p>
-          <code>ResultMap</code>　でプロパティの指定に <code>typeHandler</code> と <code>jdbcType</code> が明示的に指定されていない場合、パース時点で <code>javaType</code> はプロパティの型から推測可能ですが <code>jdbcType</code> は未知となります。 MyBatis は javaType=[推測された型] と jdbcType=null にマップされた TypeHandler を探します。
-          TypeHandler を jdbcType=null にマップするためには <code>@MappedJdbcTypes</code> の <code>includeNullJdbcType</code> 属性に <code>true</code> を指定します。<br />
-          MyBatis 3.4.0 以降は javaType に対してマップされている TypeHandler が１つの場合は登録時の jdbcType に関わらずこの TypeHandler が使われるようになりました。
+          <code>ResultMap</code> の結果マッピングに <code>typeHandler</code> を明示すると、そのハンドラーが使用されます。
+          <code>typeHandler</code> を指定せずに <code>jdbcType</code> を指定した場合は、マッピングの解析時に Java 型と指定された JDBC 型からハンドラーを解決します。
+          どちらも指定していない場合は、結果を読み込む際に Java 型と結果セットのメタデータから取得した実際の列の JDBC 型を使ってハンドラーを選択します。
+          そのため、<code>@MappedJdbcTypes</code> で登録したハンドラーは、<code>includeNullJdbcType=true</code> を指定しなくても一致する結果列に使用できます。
+          <code>includeNullJdbcType=true</code> はハンドラーを <code>jdbcType=null</code> にも登録する設定であり、<code>ResultMap</code> で使用するための必須条件ではありません。
         </p>
 
         <p>また、MyBatis にタイプハンドラーを自動検出させることもできます。</p>
@@ -1242,16 +1579,16 @@ public class GenericTypeHandler<E extends MyObject> extends BaseTypeHandler<E> {
         </p>
 
       </subsection>
-      
+
       <subsection name="Handling Enums">
         <p>
           <code>Enum</code> （列挙型）をマップする場合、
           <code>EnumTypeHandler</code> または <code>EnumOrdinalTypeHandler</code> のどちらかを使うことになります。
         </p>
-        
+
         <p>例えば数値の丸めモード（java.math.RoundingMode）を格納する場合、デフォルトでは <code>EnumTypeHandler</code> が使われ、各 <code>Enum</code> は名前の文字列（DOWN, HALF_UP, etc.）に変換されます。
         </p>
-        
+
         <b>他の TypeHandler が特定のクラスを対象としているのに対し、<code>EnumTypeHandler</code> は <code>Enum</code> を継承した任意のクラスを対象とする特別な TypeHandler です。</b>
 
         <p>では名前以外の値を格納したい場合、例えばデータベース管理者が数値で格納して欲しいと言ってきた場合はどうすれば良いのでしょうか。
@@ -1274,43 +1611,39 @@ public class GenericTypeHandler<E extends MyObject> extends BaseTypeHandler<E> {
         </p>
         <source><![CDATA[<!DOCTYPE mapper
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
-<!DOCTYPE mapper
-    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="org.apache.ibatis.submitted.rounding.Mapper">
-	<resultMap type="org.apache.ibatis.submitted.rounding.User" id="usermap">
-		<id column="id" property="id"/>
-		<result column="name" property="name"/>
-		<result column="funkyNumber" property="funkyNumber"/>
-		<result column="roundingMode" property="roundingMode"/>
-	</resultMap>
+  <resultMap type="org.apache.ibatis.submitted.rounding.User" id="usermap">
+    <id column="id" property="id"/>
+    <result column="name" property="name"/>
+    <result column="funkyNumber" property="funkyNumber"/>
+    <result column="roundingMode" property="roundingMode"/>
+  </resultMap>
 
-	<select id="getUser" resultMap="usermap">
-		select * from users
-	</select>
-	<insert id="insert">
-	    insert into users (id, name, funkyNumber, roundingMode) values (
-	    	#{id}, #{name}, #{funkyNumber}, #{roundingMode}
-	    )
-	</insert>
-	
-	<resultMap type="org.apache.ibatis.submitted.rounding.User" id="usermap2">
-		<id column="id" property="id"/>
-		<result column="name" property="name"/>
-		<result column="funkyNumber" property="funkyNumber"/>
-		<result column="roundingMode" property="roundingMode" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
-	</resultMap>
-	<select id="getUser2" resultMap="usermap2">
-		select * from users2
-	</select>
-	<insert id="insert2">
-	    insert into users2 (id, name, funkyNumber, roundingMode) values (
-	    	#{id}, #{name}, #{funkyNumber}, #{roundingMode, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
-	    )
-	</insert>
+  <select id="getUser" resultMap="usermap">
+    select * from users
+  </select>
+  <insert id="insert">
+      insert into users (id, name, funkyNumber, roundingMode) values (
+        #{id}, #{name}, #{funkyNumber}, #{roundingMode}
+      )
+  </insert>
+
+  <resultMap type="org.apache.ibatis.submitted.rounding.User" id="usermap2">
+    <id column="id" property="id"/>
+    <result column="name" property="name"/>
+    <result column="funkyNumber" property="funkyNumber"/>
+    <result column="roundingMode" property="roundingMode" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+  </resultMap>
+  <select id="getUser2" resultMap="usermap2">
+    select * from users2
+  </select>
+  <insert id="insert2">
+      insert into users2 (id, name, funkyNumber, roundingMode) values (
+        #{id}, #{name}, #{funkyNumber}, #{roundingMode, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
+      )
+  </insert>
 
 </mapper>
 ]]></source>
@@ -1328,15 +1661,22 @@ public class GenericTypeHandler<E extends MyObject> extends BaseTypeHandler<E> {
         </p>
         <source><![CDATA[// ExampleObjectFactory.java
 public class ExampleObjectFactory extends DefaultObjectFactory {
-  public Object create(Class type) {
+  @Override
+  public <T> T create(Class<T> type) {
     return super.create(type);
   }
-  public Object create(Class type, List<Class> constructorArgTypes, List<Object> constructorArgs) {
+
+  @Override
+  public <T> T create(Class<T> type, List<Class<?>> constructorArgTypes, List<Object> constructorArgs) {
     return super.create(type, constructorArgTypes, constructorArgs);
   }
+
+  @Override
   public void setProperties(Properties properties) {
     super.setProperties(properties);
   }
+
+  @Override
   public <T> boolean isCollection(Class<T> type) {
     return Collection.class.isAssignableFrom(type);
   }}
@@ -1349,7 +1689,7 @@ public class ExampleObjectFactory extends DefaultObjectFactory {
         <p>
           ObjectFactory のインターフェイスは非常にシンプルです。
           ２つある create メソッドのうち１つはデフォルトコンストラクタを扱うもので、もうひとつは引数を取るコンストラクタを扱います。<br />
-          もう１つのメソッド setProperties は ObjectFactory を設定するために使うことができます。
+          isCollection メソッドはコレクション型かどうかを判定します。setProperties メソッドは ObjectFactory を設定するために使います。
           設定ファイルの objectFactory 要素のボディで定義されているプロパティは、ObjectFactory が初期化された後に setProperties メソッドの引数として渡されます。
         </p>
 
@@ -1357,14 +1697,13 @@ public class ExampleObjectFactory extends DefaultObjectFactory {
       <subsection name="plugins">
         <p>
           MyBatis が Mapped Statement を実行する際、いくつかのタイミングで処理をインターセプトすることができます。
-          デフォルトでは、プラグインを使って下記のメソッド呼び出しをインターセプトすることができるようになっています。
+          以下は、サポートされているインターフェースでプラグインがインターセプトできるメソッドの例です。
         </p>
         <ul>
           <li>
             Executor
-            (update, query, flushStatements, commit, rollback,
-            getTransaction, close,
-            isClosed)
+            (update, query, queryCursor, flushStatements, commit, rollback,
+            getTransaction, close, isClosed)
           </li>
           <li>
             ParameterHandler
@@ -1372,11 +1711,11 @@ public class ExampleObjectFactory extends DefaultObjectFactory {
           </li>
           <li>
             ResultSetHandler
-            (handleResultSets, handleOutputParameters)
+            (handleResultSets, handleCursorResultSets, handleOutputParameters)
           </li>
           <li>
             StatementHandler
-            (prepare, parameterize, batch, update, query)
+            (prepare, parameterize, batch, update, query, queryCursor)
           </li>
         </ul>
         <p>
@@ -1395,13 +1734,19 @@ public class ExampleObjectFactory extends DefaultObjectFactory {
   method = "update",
   args = {MappedStatement.class,Object.class})})
 public class ExamplePlugin implements Interceptor {
+  private Properties properties = new Properties();
+
+  @Override
   public Object intercept(Invocation invocation) throws Throwable {
-    return invocation.proceed();
+    // implement pre processing if need
+    Object returnObject = invocation.proceed();
+    // implement post processing if need
+    return returnObject;
   }
-  public Object plugin(Object target) {
-    return Plugin.wrap(target, this);
-  }
+
+  @Override
   public void setProperties(Properties properties) {
+    this.properties = properties;
   }
 }]]></source>
 
@@ -1443,8 +1788,8 @@ public class ExamplePlugin implements Interceptor {
           </li>
         </ul>
         <p>
-          SqlSessionFactoryBuilder に envrionment を渡すことで、どの環境に対する SqlSessionFactory をビルドするか指定することができます。
-          envrionment を引数に取るシグネチャは下記の２つです。
+          SqlSessionFactoryBuilder に environment を渡すことで、どの環境に対する SqlSessionFactory をビルドするか指定することができます。
+          environment を引数に取るシグネチャは下記の２つです。
         </p>
 
         <source><![CDATA[SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader, environment);
@@ -1504,7 +1849,10 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
         <ul>
           <li>
             JDBC - JDBC トランザクションマネージャーは、単純に JDBC のコミットとロールバックの機能を直接利用します。
-            この場合、トランザクションのスコープはデータソースから取得した接続に依存します。
+            この場合、トランザクションのスコープはデータソースから取得した接続に依存します。一部のドライバーとの互換性を保つため、デフォルトでは接続をクローズする前にオートコミットを有効化するようになっていますが、この処理は他のドライバにとっては不要なだけでなく負荷の高い操作となる可能性があります。バージョン 3.5.10 以降では skipSetAutoCommitOnClose に true を設定することでオートコミットの有効化処理をスキップできるようになっています。
+            <source><![CDATA[<transactionManager type="JDBC">
+  <property name="skipSetAutoCommitOnClose" value="true"/>
+</transactionManager>]]></source>
           </li>
           <li>
             MANAGED - MANAGED トランザクションマネージャーはコミットもロールバックもしません。
@@ -1523,7 +1871,9 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
           トランザクションマネージャーに必須のプロパティはありませんが、これらはともにタイプエイリアスです。つまり、TransactionFactory インターフェイスの実装クラスの完全修飾クラス名を指定すれば、MyBatis が用意した二種類のトランザクションマネージャーの代わりに独自に実装したトランザクションマネージャーを利用することが可能です。
         </p>
         <source><![CDATA[public interface TransactionFactory {
-  void setProperties(Properties props);
+  default void setProperties(Properties props) { // Since 3.5.2, change to default method
+    // NOP
+  }
   Transaction newTransaction(Connection conn);
   Transaction newTransaction(DataSource dataSource, TransactionIsolationLevel level, boolean autoCommit);
 }]]></source>
@@ -1561,7 +1911,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
           少々遅いですが、即時の接続を必要としないシンプルなアプリケーションの場合は良い選択肢です。
           パフォーマンスに関しては、お使いのデータベースによっても変わってきます。
           接続プールの重要性が低いデータベースの場合はこの設定が最適となります。
-          UNPOOLED データソースは５つのプロパティで設定できます。
+          UNPOOLED データソースに対して設定可能なプロパティは下記の通りです。
         </p>
         <ul>
           <li>driver – JDBC ドライバーの完全修飾 Java クラス名（ドライバーに含まれているデータソースクラスではありません）
@@ -1572,7 +1922,11 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
           </li>
           <li>password - データベース接続時のパスワード
           </li>
+          <li>autoCommit – 新しい接続のオートコミットを設定します。省略した場合はドライバーのデフォルト値が使用されます。
+          </li>
           <li>defaultTransactionIsolationLevel – デフォルトのトランザクション分離レベル
+          </li>
+          <li>defaultNetworkTimeout – 任意の要求に対するデータベースからの応答待機期限のデフォルト値（ミリ秒）。詳細は <code>java.sql.Connection#setNetworkTimeout()</code> の javadoc 参照。
           </li>
         </ul>
         <p>
@@ -1593,7 +1947,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
           Web アプリケーションでは応答速度向上のために良く使われる設定です。
         </p>
         <p>
-          POOLED データソースには、UNPOOLED の設定で見た５つの他に様々なプロパティを指定することができます。
+          POOLED データソースには、UNPOOLED に対して設定可能なプロパティに加えて以下を指定することができます。
         </p>
         <ul>
           <li>poolMaximumActiveConnections – 同時にプールされる接続数の最大値です。
@@ -1601,11 +1955,19 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
           </li>
           <li>poolMaximumIdleConnections – 同時にプールされるアイドル接続数の最大値です。
           </li>
-          <li>poolMaximumCheckoutTime – プールされた接続が足りなくなった場合、使用中の接続でこの時間を経過しても戻されていない接続があれば強制的に切断されます。
+          <li>poolMaximumCheckoutTime – プールされた接続が足りなくなった場合、使用中の接続でこの時間を経過しても戻されていない接続があれば、その接続は回収されて別の要求に再割り当てされます。
             デフォルト: 20000ms （20秒）
           </li>
           <li>poolTimeToWait – 接続の取得に長時間を要した場合にログを出力し、接続の再取得を試みる機会を与えるための低レベルの設定です（プールが誤って設定された場合、無限に待機状態となってしまうのを防ぐため）。
             デフォルト: 20000ms （20秒）
+          </li>
+          <li><code>poolMaximumLocalBadConnectionTolerance</code> – This is a low level setting about
+            tolerance of bad connections got for any thread. If a thread got a bad connection, it may
+            still have another chance to re-attempt to get another connection which is valid. But the
+            retrying times should not more than the sum of <code>poolMaximumIdleConnections</code>
+            and <code>poolMaximumLocalBadConnectionTolerance</code>.
+            Default:
+            3 (Since: 3.4.5)
           </li>
           <li>poolPingQuery – プールされた接続が正常で、リクエストを受け付けられる状態にあるかどうか確認するためにデータベースに送信される ping クエリを設定します。
             デフォルトは "NO PING QUERY SET" で、一般的なドライバーであれば問い合わせは失敗し、適切なエラーメッセージが出力されるはずです。
@@ -1641,7 +2003,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
         <p>
           上記のように指定すると、"encoding=UTF8" というプロパティが InitialContext のインスタンス生成時にコンストラクタに渡されます。
         </p>
-        
+
         <p>
           上記以外の DataSource を利用する場合は <code>org.apache.ibatis.datasource.DataSourceFactory</code> インターフェイスを実装したアダプタを作成します。
         </p>
@@ -1658,7 +2020,7 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader,properti
 
         <source><![CDATA[import org.apache.ibatis.datasource.unpooled.UnpooledDataSourceFactory;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
-        
+
 public class C3P0DataSourceFactory extends UnpooledDataSourceFactory {
 
   public C3P0DataSourceFactory() {
@@ -1678,7 +2040,7 @@ public class C3P0DataSourceFactory extends UnpooledDataSourceFactory {
   <property name="password" value="root"/>
 </dataSource>
 ]]></source>
-        
+
       </subsection>
 
       <subsection name="databaseIdProvider">
@@ -1705,7 +2067,7 @@ public class C3P0DataSourceFactory extends UnpooledDataSourceFactory {
 </databaseIdProvider>]]></source>
 
     <p>
-      プロパティが指定された場合、VendorDatabaseIdProvider は <code>DatabaseMetaData#getDatabaseProductName()</code> から返された製品名に name 属性で指定された文字列が含まれているかどうかチェックし、含まれている場合は value 属性で指定されている文字列を「現在の databaseId」として返します。指定された name が一つも含まれていない場合は "null" を返します。
+      プロパティが指定された場合、VendorDatabaseIdProvider は <code>DatabaseMetaData#getDatabaseProductName()</code> から返された製品名に name 属性で指定された文字列が含まれているかどうかチェックし、含まれている場合は value 属性で指定されている文字列を「現在の databaseId」として返します。指定された name が一つも含まれていない場合は null を返します。
       上記の例で、<code>getDatabaseProductName()</code> が "Oracle (DataDirect)" という文字列を返す場合、現在の databaseId は "oracle" となります。
     </p>
 
@@ -1714,7 +2076,9 @@ public class C3P0DataSourceFactory extends UnpooledDataSourceFactory {
     </p>
 
         <source><![CDATA[public interface DatabaseIdProvider {
-  void setProperties(Properties p);
+  default void setProperties(Properties p) { // Since 3.5.2, change to default method
+    // NOP
+  }
   String getDatabaseId(DataSource dataSource) throws SQLException;
 }]]></source>
 
